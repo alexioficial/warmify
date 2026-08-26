@@ -42,6 +42,12 @@ The normal interface follows Coolify's Project → Environment → Resource work
 
 The complete API catalogue remains available as an unlinked advanced fallback for uncommon or newly introduced operations. It is not the primary management interface. There is no arbitrary upstream URL proxy.
 
+## Route structure
+
+Each resource family has its own physical SvelteKit route instead of passing through a generic `/manage/[group]` page. Collection and detail pages live under paths such as `/projects`, `/projects/[uuid]`, `/applications/[uuid]`, `/services/[uuid]`, `/databases/[uuid]`, `/deployments/[uuid]` and `/servers/[uuid]`. Infrastructure and administration follow the same pattern under `/destinations`, `/storage`, `/security/keys` and `/teams`.
+
+The route files are intentionally separate customization points, while common API, authentication, auditing and currently shared rendering logic stays in `src/lib/server` and `src/lib/components`. `/manage` is not retained as an alias. Only the unlinked advanced API catalogue uses the dynamic `/operations/[group]` route.
+
 - Upstream responses are recursively redacted before SSR and error rendering.
 - Sensitive GET responses require an explicit Reveal action and are loaded only then.
 - Stop, restart, cancel, move, migrate, rollback and similar actions require explicit confirmation.

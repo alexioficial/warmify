@@ -15,13 +15,8 @@
 </script>
 
 <p>
-	<a href={resolve('/manage/[group]', { group: 'projects' })}>Projects</a> /
-	<a
-		href={resolve('/manage/[group]/[uuid]', {
-			group: 'projects',
-			uuid: data.projectUuid
-		})}>{data.projectName}</a
-	>
+	<a href={resolve('/projects')}>Projects</a> /
+	<a href={resolve('/projects/[uuid]', { uuid: data.projectUuid })}>{data.projectName}</a>
 	/
 </p>
 <h1>New resource</h1>

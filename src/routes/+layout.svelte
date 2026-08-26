@@ -21,15 +21,15 @@
 	<div class="shell">
 		<nav aria-label="Main navigation">
 			<a href={resolve('/')}>Dashboard</a>
-			<a href={resolve('/manage/[group]', { group: 'projects' })}>Projects</a>
-			<a href={resolve('/manage/[group]', { group: 'deployments' })}>Deployments</a>
-			<a href={resolve('/manage/[group]', { group: 'servers' })}>Servers</a>
-			<a href={resolve('/manage/[group]', { group: 'sources' })}>Sources</a>
-			<a href={resolve('/manage/[group]', { group: 'destinations' })}>Destinations</a>
-			<a href={resolve('/manage/[group]', { group: 'storage' })}>S3 storage</a>
-			<a href={resolve('/manage/[group]', { group: 'security' })}>Keys</a>
-			<a href={resolve('/manage/[group]', { group: 'teams' })}>Teams</a>
-			<a href={resolve('/manage/[group]', { group: 'system' })}>System</a>
+			<a href={resolve('/projects')}>Projects</a>
+			<a href={resolve('/deployments')}>Deployments</a>
+			<a href={resolve('/servers')}>Servers</a>
+			<a href={resolve('/sources')}>Sources</a>
+			<a href={resolve('/destinations')}>Destinations</a>
+			<a href={resolve('/storage')}>S3 storage</a>
+			<a href={resolve('/security/keys')}>Keys</a>
+			<a href={resolve('/teams')}>Teams</a>
+			<a href={resolve('/system')}>System</a>
 			<a href={resolve('/search')}>Search</a>
 		</nav>
 		<main>{@render children()}</main>

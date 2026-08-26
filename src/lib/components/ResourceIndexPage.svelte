@@ -4,10 +4,22 @@
 	import DeploymentTable from '$lib/components/DeploymentTable.svelte';
 	import { versionLabel } from '$lib/resource-presenter';
 
-	let { data, form } = $props();
+	let {
+		data,
+		form
+	}: {
+		data: {
+			title: string;
+			group: string;
+			data: unknown;
+			detailPath?: string;
+			requestError?: string;
+		};
+		form?: { error?: string; message?: string; name?: string } | null;
+	} = $props();
 </script>
 
-<svelte:head><title>{data.title} — Warmify</title></svelte:head>
+<svelte:head><title>{data.title} - Warmify</title></svelte:head>
 
 <p><a href={resolve('/')}>Dashboard</a> /</p>
 <div class="section-heading"><h1>{data.title}</h1></div>

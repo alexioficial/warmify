@@ -6,7 +6,7 @@
 	let { data } = $props();
 </script>
 
-<svelte:head><title>Dashboard — Warmify</title></svelte:head>
+<svelte:head><title>Dashboard - Warmify</title></svelte:head>
 
 <h1>Dashboard</h1>
 <p class="muted">Coolify version: {versionLabel(data.version)}</p>

@@ -2,7 +2,7 @@
 	let { data, form } = $props();
 </script>
 
-<svelte:head><title>Sign in — Warmify</title></svelte:head>
+<svelte:head><title>Sign in - Warmify</title></svelte:head>
 
 <h1>Warmify</h1>
 <p>Sign in to administer the configured Coolify instance.</p>

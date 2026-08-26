@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { normalizeRecords, resourceSummary } from '$lib/resource-presenter';
+	import { detailPath } from '$lib/resource-routes';
 
 	let { data, detailGroup }: { data: unknown; detailGroup?: string } = $props();
 	const rows = $derived(
@@ -25,11 +26,8 @@
 				<tr>
 					<td>
 						{#if row.summary.id && detailGroup}
-							<a
-								href={resolve('/manage/[group]/[uuid]', {
-									group: detailGroup,
-									uuid: row.summary.id
-								})}>{row.summary.name}</a
+							<a href={resolve(detailPath(detailGroup, row.summary.id) ?? '/')}
+								>{row.summary.name}</a
 							>
 						{:else}{row.summary.name}{/if}
 						{#if row.summary.description}<br /><small>{row.summary.description}</small>{/if}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
+	import { detailPath } from '$lib/resource-routes';
 
 	let { data } = $props();
 </script>
@@ -17,10 +18,9 @@
 			{#each data.results as result (`${result.group}:${result.item.uuid ?? result.item.id}`)}
 				<li>
 					<a
-						href={resolve('/manage/[group]/[uuid]', {
-							group: result.group,
-							uuid: String(result.item.uuid ?? result.item.id)
-						})}>{String(result.item.name ?? result.item.uuid ?? result.item.id)}</a
+						href={resolve(
+							detailPath(result.group, String(result.item.uuid ?? result.item.id)) ?? '/'
+						)}>{String(result.item.name ?? result.item.uuid ?? result.item.id)}</a
 					>
 					— {result.group}
 				</li>

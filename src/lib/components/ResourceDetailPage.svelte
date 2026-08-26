@@ -13,8 +13,26 @@
 		projectEnvironments,
 		resourceSummary
 	} from '$lib/resource-presenter';
+	import { collectionPath, detailPath } from '$lib/resource-routes';
 
-	let { data, form } = $props();
+	interface ResourceDetailData {
+		title: string;
+		group: string;
+		uuid: string;
+		configurationFields: ReadonlyArray<{
+			name: string;
+			label: string;
+			type?: 'text' | 'url' | 'number' | 'textarea';
+		}>;
+		data: unknown;
+		related: Record<string, unknown>;
+		requestError?: string;
+	}
+
+	let {
+		data,
+		form
+	}: { data: ResourceDetailData; form?: { error?: string; message?: string } | null } = $props();
 	const record = $derived(asRecord(data.data));
 	const related = $derived((data.related ?? {}) as Record<string, unknown>);
 	const summary = $derived(resourceSummary(data.data, data.group));
@@ -88,7 +106,7 @@
 
 <p>
 	<a href={resolve('/')}>Dashboard</a> /
-	<a href={resolve('/manage/[group]', { group: data.group })}>{data.title}</a> /
+	<a href={resolve(collectionPath(data.group) ?? '/')}>{data.title}</a> /
 </p>
 <div class="resource-heading">
 	<div>
@@ -163,7 +181,7 @@
 			<div class="section-heading">
 				<h2>Environments</h2>
 				<div class="actions">
-					<a href={resolve('/manage/projects/[uuid]/new', { uuid: data.uuid })}>Create resource</a>
+					<a href={resolve(`/projects/${encodeURIComponent(data.uuid)}/new`)}>Create resource</a>
 					<details>
 						<summary>Add environment</summary>
 						<form method="POST" action="?/createEnvironment">
@@ -182,10 +200,9 @@
 						{#each environment.resources as resource (resource.id)}
 							<li>
 								<a
-									href={resolve('/manage/[group]/[uuid]', {
-										group: resource.group,
-										uuid: resource.id
-									})}><strong>{resource.name}</strong></a
+									href={resolve(
+										detailPath(resource.group, resource.id) ?? collectionPath(resource.group) ?? '/'
+									)}><strong>{resource.name}</strong></a
 								>
 								— {resource.type} —
 								<span class={statusClass(resource.status)}>{resource.status}</span>

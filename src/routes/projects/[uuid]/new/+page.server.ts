@@ -1,6 +1,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 
 import { asRecord, firstText, normalizeRecords } from '$lib/resource-presenter';
+import { detailPath } from '$lib/resource-routes';
 import { CoolifyError } from '$lib/server/coolify-client';
 import { redactSecrets } from '$lib/server/redact';
 import { newResourceRequest } from '$lib/server/resource-actions';
@@ -126,7 +127,7 @@ export const actions: Actions = {
 			});
 			const uuid = firstText(asRecord(result), ['uuid', 'id']);
 			if (!uuid) return { message: 'Resource created', values: {} };
-			redirectTarget = `/manage/${creation.group}/${encodeURIComponent(uuid)}`;
+			redirectTarget = detailPath(creation.group, uuid) ?? '/projects';
 		} catch (caught) {
 			audit({
 				user: locals.user?.username,
