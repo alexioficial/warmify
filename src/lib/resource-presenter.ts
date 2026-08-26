@@ -15,6 +15,13 @@ export interface DeploymentSummary {
 	status: string;
 	message: string;
 	createdAt: string;
+	environment: string;
+	server: string;
+}
+
+export interface ProjectStats {
+	environments: number;
+	resources: number;
 }
 
 export interface ProjectResource extends ResourceSummary {
@@ -134,7 +141,33 @@ export function deploymentSummary(value: unknown): DeploymentSummary {
 		name: firstText(record, ['application_name', 'name', 'application_uuid']) || 'Deployment',
 		status: humanize(firstText(record, ['status'])),
 		message: firstText(record, ['commit_message', 'message', 'commit', 'git_commit_sha']),
-		createdAt: firstText(record, ['created_at', 'started_at', 'updated_at'])
+		createdAt: firstText(record, ['created_at', 'started_at', 'updated_at']),
+		environment:
+			nestedText(record, 'environment', ['name']) || firstText(record, ['environment_name']),
+		server: nestedText(record, 'server', ['name']) || firstText(record, ['server_name'])
+	};
+}
+
+export function projectStats(value: unknown): ProjectStats {
+	const record = asRecord(value);
+	const environments = normalizeRecords(record?.environments);
+	const explicitEnvironments = Number(firstText(record, ['environments_count']));
+	const explicitResources = Number(firstText(record, ['resources_count']));
+	const resources = environments.reduce(
+		(total, environment) =>
+			total +
+			normalizeRecords(environment.applications).length +
+			normalizeRecords(environment.services).length +
+			normalizeRecords(environment.databases).length,
+		0
+	);
+	return {
+		environments:
+			Number.isFinite(explicitEnvironments) && explicitEnvironments > 0
+				? explicitEnvironments
+				: environments.length,
+		resources:
+			Number.isFinite(explicitResources) && explicitResources > 0 ? explicitResources : resources
 	};
 }
 
@@ -201,6 +234,22 @@ export function formatTimestamp(value: unknown): string {
 		dateStyle: 'medium',
 		timeStyle: 'short'
 	}).format(timestamp);
+}
+
+export function formatRelativeTime(value: unknown, now = new Date()): string {
+	if (typeof value !== 'string' || !value) return '—';
+	const timestamp = new Date(value);
+	if (Number.isNaN(timestamp.getTime())) return value;
+	const seconds = Math.round((timestamp.getTime() - now.getTime()) / 1000);
+	const formatter = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+	for (const [unit, divisor] of [
+		['day', 86_400],
+		['hour', 3_600],
+		['minute', 60]
+	] as const) {
+		if (Math.abs(seconds) >= divisor) return formatter.format(Math.round(seconds / divisor), unit);
+	}
+	return formatter.format(seconds, 'second');
 }
 
 export function versionLabel(value: unknown): string {

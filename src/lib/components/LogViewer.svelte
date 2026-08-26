@@ -7,12 +7,9 @@
 		url,
 		interval = 5000
 	}: { initial: unknown; url?: string; interval?: number } = $props();
-	let data = $state<unknown>();
+	let refreshed = $state<{ value: unknown }>();
+	let data = $derived(refreshed ? refreshed.value : initial);
 	let error = $state('');
-
-	$effect.pre(() => {
-		if (data === undefined) data = initial;
-	});
 
 	onMount(() => {
 		if (!url) return;
@@ -21,7 +18,7 @@
 			try {
 				const response = await fetch(url);
 				if (!response.ok) throw new Error(`Log refresh failed (${response.status})`);
-				data = await response.json();
+				refreshed = { value: await response.json() };
 				error = '';
 			} catch (caught) {
 				error = caught instanceof Error ? caught.message : 'Log refresh failed';

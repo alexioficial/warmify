@@ -1,4 +1,13 @@
-const projects = [{ id: 1, uuid: 'project-1', name: 'Documentation', description: 'Main project' }];
+const projects = [
+	{
+		id: 1,
+		uuid: 'project-1',
+		name: 'Documentation',
+		description: 'Main project',
+		environments_count: 1,
+		resources_count: 1
+	}
+];
 const servers = [
 	{ id: 1, uuid: 'server-1', name: 'Primary server', ip: '10.0.0.1', status: 'running' }
 ];
@@ -8,7 +17,17 @@ const deployments = [
 		application_name: 'wiki',
 		status: 'in_progress',
 		commit_message: 'Update documentation',
-		created_at: '2026-08-26T01:00:00Z'
+		created_at: '2026-08-26T01:00:00Z',
+		environment: { name: 'production' },
+		server: { name: 'Primary server' }
+	}
+];
+const sources = [
+	{
+		uuid: 'source-1',
+		name: 'widube',
+		provider: 'GitHub',
+		status: 'connected'
 	}
 ];
 const environments = [
@@ -52,6 +71,7 @@ Bun.serve({
 			'/api/v1/projects/project-1/environments': environments,
 			'/api/v1/projects/project-1/envs': [],
 			'/api/v1/servers': servers,
+			'/api/v1/github-apps': sources,
 			'/api/v1/destinations': [
 				{ uuid: 'destination-1', name: 'Primary destination', server: { name: 'Primary server' } }
 			],

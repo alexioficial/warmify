@@ -4,10 +4,12 @@ import {
 	additionalData,
 	deploymentSummary,
 	environmentVariableSummary,
+	formatRelativeTime,
 	formatTimestamp,
 	logText,
 	normalizeRecords,
 	projectEnvironments,
+	projectStats,
 	resourceSummary,
 	versionLabel
 } from './resource-presenter';
@@ -29,14 +31,39 @@ describe('resource presenter', () => {
 				status: 'in_progress',
 				commit_message: 'Document API',
 				created_at: '2026-08-26T01:00:00Z',
+				environment: { name: 'production' },
 				server: { name: 'primary' }
 			})
 		).toMatchObject({
 			id: 'deploy-1',
 			name: 'docs',
 			status: 'In progress',
-			message: 'Document API'
+			message: 'Document API',
+			environment: 'production',
+			server: 'primary'
 		});
+	});
+
+	test('counts nested project environments and resources for project summaries', () => {
+		expect(
+			projectStats({
+				environments: [
+					{
+						applications: [{ uuid: 'app-1' }, { uuid: 'app-2' }],
+						services: [{ uuid: 'service-1' }],
+						databases: []
+					},
+					{ applications: [], services: [], databases: [{ uuid: 'database-1' }] }
+				]
+			})
+		).toEqual({ environments: 2, resources: 4 });
+	});
+
+	test('formats recent activity as compact relative time', () => {
+		expect(formatRelativeTime('2026-08-26T10:00:00Z', new Date('2026-08-26T12:00:00Z'))).toBe(
+			'2 hours ago'
+		);
+		expect(formatRelativeTime('', new Date('2026-08-26T12:00:00Z'))).toBe('—');
 	});
 
 	test('summarizes resources by family using deliberate fields', () => {

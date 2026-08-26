@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import DeploymentTable from '$lib/components/DeploymentTable.svelte';
+	import ProjectGrid from '$lib/components/ProjectGrid.svelte';
 	import { versionLabel } from '$lib/resource-presenter';
 
 	let {
@@ -21,24 +21,35 @@
 
 <svelte:head><title>{data.title} - Warmify</title></svelte:head>
 
-<p><a href={resolve('/')}>Dashboard</a> /</p>
-<div class="section-heading"><h1>{data.title}</h1></div>
+<div class="page-header">
+	<div>
+		<h1>{data.title}</h1>
+		<p class="muted">
+			{#if data.group === 'projects'}Your deployment workspaces
+			{:else if data.group === 'servers'}Infrastructure available for deployments
+			{:else if data.group === 'sources'}Git sources connected to your team
+			{:else if data.group === 'deployments'}Deployment activity
+			{:else}Manage {data.title.toLowerCase()}{/if}
+		</p>
+	</div>
+	{#if data.group === 'projects'}
+		<details>
+			<summary class="button primary">New project</summary>
+			<form method="POST" action="?/createProject">
+				<label>Name <input name="name" value={form?.name ?? ''} required /></label>
+				<label>Description <textarea name="description"></textarea></label>
+				<button class="primary" type="submit">Create project</button>
+			</form>
+		</details>
+	{/if}
+</div>
 {#if data.requestError}<p class="error" role="alert">{data.requestError}</p>{/if}
 {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 {#if form?.message}<p role="status">{form.message}</p>{/if}
 
 {#if data.group === 'projects'}
-	<details>
-		<summary>Create project</summary>
-		<form method="POST" action="?/createProject">
-			<label>Name <input name="name" value={form?.name ?? ''} required /></label>
-			<label>Description <textarea name="description"></textarea></label>
-			<button type="submit">Create project</button>
-		</form>
-	</details>
-{/if}
-
-{#if data.group === 'deployments'}
+	<ProjectGrid data={data.data} searchable />
+{:else if data.group === 'deployments'}
 	<DeploymentTable data={data.data} />
 {:else if data.group === 'system'}
 	<dl class="overview">
@@ -66,5 +77,10 @@
 		</form>
 	</details>
 {:else}
-	<DataTable data={data.data} detailGroup={data.detailPath ? data.group : undefined} />
+	<DataTable
+		data={data.data}
+		detailGroup={data.detailPath ? data.group : undefined}
+		displayGroup={data.group}
+		searchable
+	/>
 {/if}

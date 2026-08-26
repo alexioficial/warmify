@@ -13,21 +13,43 @@
 		projectEnvironments,
 		resourceSummary
 	} from '$lib/resource-presenter';
-	import { collectionPath, detailPath } from '$lib/resource-routes';
+	import { detailPath } from '$lib/resource-routes';
+
+	interface ConfigurationField {
+		name: string;
+		label: string;
+		type?: 'text' | 'url' | 'number' | 'textarea';
+	}
 
 	interface ResourceDetailData {
-		title: string;
 		group: string;
 		uuid: string;
-		configurationFields: ReadonlyArray<{
-			name: string;
-			label: string;
-			type?: 'text' | 'url' | 'number' | 'textarea';
-		}>;
+		configurationFields: ReadonlyArray<ConfigurationField>;
 		data: unknown;
 		related: Record<string, unknown>;
 		requestError?: string;
 	}
+
+	const applicationFieldGroups = [
+		{ id: 'application-details', title: 'Application details', names: ['name', 'description'] },
+		{ id: 'access', title: 'Access', names: ['fqdn'] },
+		{
+			id: 'build-pipeline',
+			title: 'Build pipeline',
+			names: [
+				'git_repository',
+				'git_branch',
+				'base_directory',
+				'publish_directory',
+				'build_pack',
+				'install_command',
+				'build_command',
+				'start_command'
+			]
+		},
+		{ id: 'networking', title: 'Networking', names: ['ports_exposes'] },
+		{ id: 'healthcheck', title: 'Healthcheck', names: ['health_check_path'] }
+	] as const;
 
 	let {
 		data,
@@ -41,6 +63,7 @@
 	);
 	const variableGroups = new Set(['projects', 'applications', 'services', 'databases', 'servers']);
 	const lifecycleGroups = new Set(['applications', 'services', 'databases']);
+	const settingsNavGroups = new Set(['applications', 'services', 'databases']);
 	const deletableGroups = new Set([
 		'projects',
 		'applications',
@@ -51,6 +74,25 @@
 		'storage',
 		'security'
 	]);
+	const configurationGroups = $derived(
+		data.group === 'applications'
+			? applicationFieldGroups
+					.map((group) => ({
+						id: group.id,
+						title: group.title,
+						fields: data.configurationFields.filter((field) =>
+							(group.names as readonly string[]).includes(field.name)
+						)
+					}))
+					.filter((group) => group.fields.length > 0)
+			: [
+					{
+						id: 'configuration',
+						title: 'Configuration',
+						fields: [...data.configurationFields]
+					}
+				]
+	);
 	const knownKeys = $derived([
 		'uuid',
 		'id',
@@ -104,20 +146,23 @@
 	}
 </script>
 
-<p>
-	<a href={resolve('/')}>Dashboard</a> /
-	<a href={resolve(collectionPath(data.group) ?? '/')}>{data.title}</a> /
-</p>
-<div class="resource-heading">
+<svelte:head><title>{summary.name} - Warmify</title></svelte:head>
+
+<div class="resource-heading page-header">
 	<div>
 		<h1>{summary.name}</h1>
-		{#if summary.description}<p>{summary.description}</p>{/if}
+		<div class="actions">
+			<span class={statusClass(summary.status)}>{summary.status}</span>
+			{#if summary.description}<span class="muted">{summary.description}</span>{/if}
+		</div>
 	</div>
 	{#if lifecycleGroups.has(data.group)}
 		<div class="actions">
 			<form class="action-form" method="POST" action="?/lifecycle">
 				<button name="action" value="start">Start</button>
-				{#if data.group === 'applications'}<button name="action" value="deploy">Deploy</button>{/if}
+				{#if data.group === 'applications'}<button class="primary" name="action" value="deploy"
+						>Deploy</button
+					>{/if}
 			</form>
 			<form class="action-form" method="POST" action="?/lifecycle">
 				<input type="hidden" name="confirmation" value="confirm" />
@@ -133,209 +178,236 @@
 		</div>
 	{/if}
 </div>
+
 {#if data.requestError}<p class="error" role="alert">{data.requestError}</p>{/if}
 {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 {#if form?.message}<p role="status">{form.message}</p>{/if}
 
 {#if record}
-	<nav class="resource-nav" aria-label="Resource sections">
-		<a href="#overview">Overview</a>
-		{#if data.group === 'projects'}<a href="#environments">Environments</a>{/if}
-		{#if data.configurationFields.length}<a href="#configuration">Configuration</a>{/if}
-		{#if variableGroups.has(data.group)}<a href="#variables">Environment variables</a>{/if}
-		{#if related.deployments}<a href="#deployments">Deployments</a>{/if}
-		{#if related.logs !== undefined || record.logs}<a href="#logs">Logs</a>{/if}
-		{#if related.storages}<a href="#storage">Storage</a>{/if}
-	</nav>
+	<div class:resource-layout={settingsNavGroups.has(data.group)}>
+		{#if settingsNavGroups.has(data.group)}
+			<nav class="resource-nav" aria-label="Resource settings">
+				<p class="nav-heading">Settings</p>
+				<a href="#overview">General</a>
+				{#each configurationGroups as group (group.id)}
+					<a href={`#${group.id}`}>{group.title}</a>
+				{/each}
+				{#if variableGroups.has(data.group)}<a href="#variables">Environment variables</a>{/if}
+				{#if related.storages}<a href="#storage">Persistent storage</a>{/if}
+				{#if related.tasks}<a href="#tasks">Scheduled tasks</a>{/if}
+				<p class="nav-heading">Observe & troubleshoot</p>
+				{#if related.deployments}<a href="#deployments">Deployments</a>{/if}
+				{#if related.logs !== undefined || record.logs}<a href="#logs">Runtime logs</a>{/if}
+			</nav>
+		{/if}
 
-	<section id="overview">
-		<h2>Overview</h2>
-		<dl class="overview">
-			<dt>UUID</dt>
-			<dd><code>{data.uuid}</code></dd>
-			<dt>Type</dt>
-			<dd>{summary.type}</dd>
-			<dt>Status</dt>
-			<dd class={statusClass(summary.status)}>{summary.status}</dd>
-			{#if fieldValue('fqdn')}<dt>Domains</dt>
-				<dd>{fieldValue('fqdn')}</dd>{/if}
-			{#if fieldValue('git_repository')}<dt>Repository</dt>
-				<dd>{fieldValue('git_repository')}</dd>{/if}
-			{#if fieldValue('git_branch')}<dt>Branch</dt>
-				<dd>{fieldValue('git_branch')}</dd>{/if}
-			{#if nestedValue('environment') || fieldValue('environment_name')}<dt>Environment</dt>
-				<dd>{nestedValue('environment') || fieldValue('environment_name')}</dd>{/if}
-			{#if nestedValue('server') || fieldValue('server_name')}<dt>Server</dt>
-				<dd>{nestedValue('server') || fieldValue('server_name')}</dd>{/if}
-			{#if fieldValue('ip')}<dt>Address</dt>
-				<dd>
-					{fieldValue('user') ? `${fieldValue('user')}@` : ''}{fieldValue('ip')}{fieldValue('port')
-						? `:${fieldValue('port')}`
-						: ''}
-				</dd>{/if}
-		</dl>
-	</section>
+		<div class="resource-content">
+			<section id="overview">
+				<h2>General</h2>
+				<dl class="overview">
+					<dt>UUID</dt>
+					<dd><code>{data.uuid}</code></dd>
+					<dt>Type</dt>
+					<dd>{summary.type}</dd>
+					<dt>Status</dt>
+					<dd><span class={statusClass(summary.status)}>{summary.status}</span></dd>
+					{#if fieldValue('fqdn')}<dt>Domains</dt>
+						<dd>{fieldValue('fqdn')}</dd>{/if}
+					{#if fieldValue('git_repository')}<dt>Repository</dt>
+						<dd>{fieldValue('git_repository')}</dd>{/if}
+					{#if fieldValue('git_branch')}<dt>Branch</dt>
+						<dd>{fieldValue('git_branch')}</dd>{/if}
+					{#if nestedValue('environment') || fieldValue('environment_name')}<dt>Environment</dt>
+						<dd>{nestedValue('environment') || fieldValue('environment_name')}</dd>{/if}
+					{#if nestedValue('server') || fieldValue('server_name')}<dt>Server</dt>
+						<dd>{nestedValue('server') || fieldValue('server_name')}</dd>{/if}
+					{#if fieldValue('ip')}<dt>Address</dt>
+						<dd>
+							{fieldValue('user') ? `${fieldValue('user')}@` : ''}{fieldValue('ip')}{fieldValue(
+								'port'
+							)
+								? `:${fieldValue('port')}`
+								: ''}
+						</dd>{/if}
+				</dl>
+			</section>
 
-	{#if data.group === 'projects'}
-		<section id="environments">
-			<div class="section-heading">
-				<h2>Environments</h2>
-				<div class="actions">
-					<a href={resolve(`/projects/${encodeURIComponent(data.uuid)}/new`)}>Create resource</a>
+			{#if data.group === 'projects'}
+				<section id="environments">
+					<div class="section-heading">
+						<div>
+							<h2>Environments</h2>
+							<p class="muted">Resources grouped by deployment environment</p>
+						</div>
+						<div class="actions">
+							<a
+								class="button primary"
+								href={resolve(`/projects/${encodeURIComponent(data.uuid)}/new`)}>New resource</a
+							>
+							<details>
+								<summary>Add environment</summary>
+								<form method="POST" action="?/createEnvironment">
+									<label>Name <input name="name" placeholder="production" required /></label>
+									<label>Description <textarea name="description"></textarea></label>
+									<button class="primary" type="submit">Create environment</button>
+								</form>
+							</details>
+						</div>
+					</div>
+					{#each environments as environment (environment.id)}
+						<article class="environment-panel">
+							<header>
+								<h3>{environment.name}</h3>
+								<p class="muted">
+									{environment.resources.length}
+									{environment.resources.length === 1 ? 'resource' : 'resources'}
+								</p>
+							</header>
+							{#if environment.resources.length}
+								<ul class="resource-list">
+									{#each environment.resources as resource (resource.id)}
+										<li>
+											<a href={resolve(detailPath(resource.group, resource.id) ?? '/')}
+												>{resource.name}</a
+											>
+											<span>{resource.type}</span>
+											<span class={statusClass(resource.status)}>{resource.status}</span>
+										</li>
+									{/each}
+								</ul>
+							{:else}
+								<p class="muted">No resources in this environment.</p>
+							{/if}
+						</article>
+					{:else}
+						<p class="muted">No environments found.</p>
+					{/each}
+				</section>
+			{/if}
+
+			{#if data.group === 'services'}
+				<section>
+					<h2>Service resources</h2>
+					<h3>Applications</h3>
+					<DataTable data={related.applications} detailGroup="applications" />
+					<h3>Databases</h3>
+					<DataTable data={related.databases} detailGroup="databases" />
+				</section>
+			{:else if data.group === 'servers'}
+				<section>
+					<h2>Resources</h2>
+					<DataTable data={related.resources} />
+					{#if related.domains}<h3>Domains</h3>
+						<DataTable data={related.domains} />{/if}
+				</section>
+			{/if}
+
+			{#if data.configurationFields.length}
+				<form method="POST" action="?/save">
+					{#each configurationGroups as group (group.id)}
+						<section class="settings-section" id={group.id}>
+							<h2>{group.title}</h2>
+							<div class="field-grid">
+								{#each group.fields as field (field.name)}
+									<label class:wide={field.type === 'textarea'}>
+										{field.label}
+										{#if field.type === 'textarea'}
+											<textarea name={field.name}>{fieldValue(field.name)}</textarea>
+										{:else}
+											<input
+												name={field.name}
+												type={field.type ?? 'text'}
+												value={fieldValue(field.name)}
+											/>
+										{/if}
+									</label>
+								{/each}
+							</div>
+						</section>
+					{/each}
+					<button class="primary" type="submit">Save configuration</button>
+				</form>
+			{/if}
+
+			{#if variableGroups.has(data.group)}
+				<section id="variables">
+					<div class="section-heading">
+						<h2>Environment variables</h2>
+						<RevealSecret
+							operationId={`GET:/${data.group}/{uuid}/envs`}
+							parameters={{ uuid: data.uuid }}
+						/>
+					</div>
+					<EnvironmentTable data={related.variables} />
 					<details>
-						<summary>Add environment</summary>
-						<form method="POST" action="?/createEnvironment">
-							<label>Name <input name="name" placeholder="production" required /></label>
-							<label>Description <textarea name="description"></textarea></label>
-							<button type="submit">Create environment</button>
+						<summary>Add variable</summary>
+						<form method="POST" action="?/createVariable">
+							<label>Key <input name="key" required /></label>
+							<label>Value <textarea name="value" required></textarea></label>
+							<div class="inline-list">
+								<label><input type="checkbox" name="is_build_time" /> Build time</label>
+								<label><input type="checkbox" name="is_preview" /> Preview</label>
+								<label><input type="checkbox" name="is_literal" /> Literal</label>
+								<label><input type="checkbox" name="is_multiline" /> Multiline</label>
+							</div>
+							<button class="primary" type="submit">Add variable</button>
 						</form>
 					</details>
-				</div>
-			</div>
-			{#each environments as environment (environment.id)}
-				<h3>{environment.name}</h3>
-				{#if environment.description}<p>{environment.description}</p>{/if}
-				{#if environment.resources.length}
-					<ul class="resource-list">
-						{#each environment.resources as resource (resource.id)}
-							<li>
-								<a
-									href={resolve(
-										detailPath(resource.group, resource.id) ?? collectionPath(resource.group) ?? '/'
-									)}><strong>{resource.name}</strong></a
-								>
-								— {resource.type} —
-								<span class={statusClass(resource.status)}>{resource.status}</span>
-							</li>
-						{/each}
-					</ul>
-				{:else}
-					<p class="muted">No resources in this environment.</p>
-				{/if}
-			{:else}
-				<p class="muted">No environments found.</p>
-			{/each}
-		</section>
-	{/if}
+				</section>
+			{/if}
 
-	{#if data.group === 'services'}
-		<section>
-			<h2>Service resources</h2>
-			<h3>Applications</h3>
-			<DataTable data={related.applications} detailGroup="applications" />
-			<h3>Databases</h3>
-			<DataTable data={related.databases} detailGroup="databases" />
-		</section>
-	{:else if data.group === 'servers'}
-		<section>
-			<h2>Resources</h2>
-			<DataTable data={related.resources} />
-			{#if related.domains}<h3>Domains</h3>
-				<DataTable data={related.domains} />{/if}
-		</section>
-	{/if}
+			{#if related.deployments}
+				<section id="deployments">
+					<h2>Deployments</h2>
+					<DeploymentTable data={related.deployments} />
+				</section>
+			{/if}
 
-	{#if related.deployments}
-		<section id="deployments">
-			<h2>Deployments</h2>
-			<DeploymentTable data={related.deployments} />
-		</section>
-	{/if}
+			{#if related.logs !== undefined || record.logs}
+				<section id="logs">
+					<h2>Runtime logs</h2>
+					<LogViewer
+						initial={related.logs ?? record.logs}
+						url={logKind()
+							? `/internal/poll/${logKind()}/${encodeURIComponent(data.uuid)}`
+							: undefined}
+					/>
+				</section>
+			{/if}
 
-	{#if data.configurationFields.length}
-		<section id="configuration">
-			<h2>Configuration</h2>
-			<form method="POST" action="?/save">
-				<fieldset>
-					<legend>General</legend>
-					{#each data.configurationFields as field (field.name)}
-						<label>
-							{field.label}
-							{#if field.type === 'textarea'}
-								<textarea name={field.name}>{fieldValue(field.name)}</textarea>
-							{:else}
-								<input
-									name={field.name}
-									type={field.type ?? 'text'}
-									value={fieldValue(field.name)}
-								/>
-							{/if}
-						</label>
-					{/each}
-					<button type="submit">Save configuration</button>
-				</fieldset>
-			</form>
-		</section>
-	{/if}
+			{#if related.storages}
+				<section id="storage">
+					<h2>Persistent storage</h2>
+					<DataTable data={related.storages} />
+				</section>
+			{/if}
+			{#if related.backups}
+				<section>
+					<h2>Backups</h2>
+					<DataTable data={related.backups} />
+				</section>
+			{/if}
+			{#if related.tasks}
+				<section id="tasks">
+					<h2>Scheduled tasks</h2>
+					<DataTable data={related.tasks} />
+				</section>
+			{/if}
 
-	{#if variableGroups.has(data.group)}
-		<section id="variables">
-			<div class="section-heading">
-				<h2>Environment variables</h2>
-				<RevealSecret
-					operationId={`GET:/${data.group}/{uuid}/envs`}
-					parameters={{ uuid: data.uuid }}
-				/>
-			</div>
-			<EnvironmentTable data={related.variables} />
-			<details>
-				<summary>Add variable</summary>
-				<form method="POST" action="?/createVariable">
-					<label>Key <input name="key" required /></label>
-					<label>Value <textarea name="value" required></textarea></label>
-					<div class="inline-list">
-						<label><input type="checkbox" name="is_build_time" /> Build time</label>
-						<label><input type="checkbox" name="is_preview" /> Preview</label>
-						<label><input type="checkbox" name="is_literal" /> Literal</label>
-						<label><input type="checkbox" name="is_multiline" /> Multiline</label>
-					</div>
-					<button type="submit">Add variable</button>
-				</form>
-			</details>
-		</section>
-	{/if}
+			<AdditionalData data={extra} />
 
-	{#if related.logs !== undefined || record.logs}
-		<section id="logs">
-			<h2>Logs</h2>
-			<LogViewer
-				initial={related.logs ?? record.logs}
-				url={logKind() ? `/internal/poll/${logKind()}/${encodeURIComponent(data.uuid)}` : undefined}
-			/>
-		</section>
-	{/if}
-
-	{#if related.storages}
-		<section id="storage">
-			<h2>Storage</h2>
-			<DataTable data={related.storages} />
-		</section>
-	{/if}
-	{#if related.backups}
-		<section>
-			<h2>Backups</h2>
-			<DataTable data={related.backups} />
-		</section>
-	{/if}
-	{#if related.tasks}
-		<section>
-			<h2>Scheduled tasks</h2>
-			<DataTable data={related.tasks} />
-		</section>
-	{/if}
-
-	<AdditionalData data={extra} />
-
-	{#if deletableGroups.has(data.group)}
-		<details>
-			<summary class="danger">Delete resource</summary>
-			<p class="danger">
-				This cannot be undone. Type <strong>{summary.name || data.uuid}</strong> exactly.
-			</p>
-			<form method="POST" action="?/deleteResource">
-				<label>Confirmation <input name="confirmation" required /></label>
-				<button type="submit">Delete {summary.type.toLowerCase()}</button>
-			</form>
-		</details>
-	{/if}
+			{#if deletableGroups.has(data.group)}
+				<details>
+					<summary class="danger">Delete resource</summary>
+					<p class="danger">
+						This cannot be undone. Type <strong>{summary.name || data.uuid}</strong> exactly.
+					</p>
+					<form method="POST" action="?/deleteResource">
+						<label>Confirmation <input name="confirmation" required /></label>
+						<button type="submit">Delete {summary.type.toLowerCase()}</button>
+					</form>
+				</details>
+			{/if}
+		</div>
+	</div>
 {/if}
