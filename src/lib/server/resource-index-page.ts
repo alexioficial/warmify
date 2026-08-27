@@ -2,6 +2,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 
 import { asRecord, firstText } from '$lib/resource-presenter';
 import { CoolifyError } from '$lib/server/coolify-client';
+import { collectionForPage, invalidateCollection } from '$lib/server/inventory-cache';
 import { executeOperation } from '$lib/server/operations';
 import { redactSecrets } from '$lib/server/redact';
 import { resourceGroups } from '$lib/server/resource-groups';
@@ -21,7 +22,7 @@ export async function loadResourceIndex(
 		return {
 			group: groupName,
 			...group,
-			data: redactSecrets(await getCoolifyClient().request('GET', group.listPath))
+			data: redactSecrets(await collectionForPage(groupName))
 		};
 	} catch (caught) {
 		return {
@@ -53,6 +54,7 @@ export function createIndexActions(groupName: string) {
 					duration_ms: Date.now() - started
 				});
 				createdUuid = firstText(asRecord(result), ['uuid', 'id']);
+				invalidateCollection('projects');
 				if (!createdUuid) return { message: 'Project created', name: '' };
 			} catch (caught) {
 				const status =
@@ -102,6 +104,7 @@ export function createIndexActions(groupName: string) {
 					result: 'success',
 					duration_ms: Date.now() - started
 				});
+				invalidateCollection('system');
 				return { message: `${action.replace('-', ' ')} requested` };
 			} catch (caught) {
 				const status = caught instanceof CoolifyError ? caught.status : 500;

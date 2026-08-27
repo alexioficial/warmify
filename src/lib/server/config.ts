@@ -8,6 +8,7 @@ export interface WarmifyConfig {
 	sessionSecret: string;
 	sessionTtlHours: number;
 	requestTimeoutMs: number;
+	dataDir: string;
 }
 
 function required(env: Record<string, string | undefined>, name: string): string {
@@ -55,6 +56,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
 			env.WARMIFY_REQUEST_TIMEOUT_MS,
 			15_000,
 			'WARMIFY_REQUEST_TIMEOUT_MS'
-		)
+		),
+		dataDir: env.WARMIFY_DATA_DIR?.trim() || '.warmify-data'
 	};
 }

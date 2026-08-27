@@ -3,6 +3,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { asRecord, firstText } from '$lib/resource-presenter';
 import type { CoolifyMethod, CoolifyRequestOptions } from '$lib/server/coolify-client';
 import { CoolifyError } from '$lib/server/coolify-client';
+import { invalidateCollection } from '$lib/server/inventory-cache';
 import { redactSecrets } from '$lib/server/redact';
 import { configurationBody, resourceActionRequest } from '$lib/server/resource-actions';
 import { resourceGroups } from '$lib/server/resource-groups';
@@ -167,6 +168,9 @@ export function createResourceActions(groupName: string) {
 				);
 				if (!result.success)
 					return fail(failureStatus(result.caught), { error: failureMessage(result.caught) });
+				invalidateCollection(groupName);
+				invalidateCollection('resources');
+				invalidateCollection('deployments');
 				return { message: `${action.charAt(0).toUpperCase()}${action.slice(1)} requested` };
 			} catch (caught) {
 				return fail(failureStatus(caught), { error: failureMessage(caught) });
@@ -190,6 +194,8 @@ export function createResourceActions(groupName: string) {
 			);
 			if (!result.success)
 				return fail(failureStatus(result.caught), { error: failureMessage(result.caught) });
+			invalidateCollection(groupName);
+			invalidateCollection('resources');
 			return { message: 'Configuration saved' };
 		},
 
@@ -216,6 +222,7 @@ export function createResourceActions(groupName: string) {
 			);
 			if (!result.success)
 				return fail(failureStatus(result.caught), { error: failureMessage(result.caught) });
+			invalidateCollection('projects');
 			return { message: `Environment ${name} created` };
 		},
 
@@ -275,6 +282,9 @@ export function createResourceActions(groupName: string) {
 				);
 				if (!result.success)
 					return fail(failureStatus(result.caught), { error: failureMessage(result.caught) });
+				invalidateCollection(groupName);
+				invalidateCollection('resources');
+				invalidateCollection('projects');
 			} catch (caught) {
 				return fail(failureStatus(caught), { error: failureMessage(caught) });
 			}

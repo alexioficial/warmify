@@ -9,6 +9,7 @@ node_modules
 /build
 /test-results
 /playwright-report
+/.warmify-data
 
 # OS
 .DS_Store
@@ -23,3 +24,5 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+*.db

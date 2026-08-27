@@ -3,7 +3,10 @@
 	import { normalizeRecords, projectStats, resourceSummary } from '$lib/resource-presenter';
 	import { detailPath } from '$lib/resource-routes';
 
-	let { data, searchable = false }: { data: unknown; searchable?: boolean } = $props();
+	let {
+		data,
+		searchable = false
+	}: { data: unknown; searchable?: boolean } = $props();
 	let query = $state('');
 	const projects = $derived(
 		normalizeRecords(data).map((record) => ({
@@ -32,11 +35,12 @@
 {#if visibleProjects.length}
 	<div class="project-grid">
 		{#each visibleProjects as project, index (project.summary.id || index)}
-			<article class="project-item">
+			<a
+				class="project-item"
+				href={resolve(detailPath('projects', project.summary.id) ?? '/projects')}
+			>
 				<div>
-					<a href={resolve(detailPath('projects', project.summary.id) ?? '/projects')}
-						>{project.summary.name}</a
-					>
+					<strong class="project-title">{project.summary.name}</strong>
 					<p class="muted">{project.summary.description || 'No description'}</p>
 				</div>
 				<div class="project-stats">
@@ -47,7 +51,7 @@
 						{project.stats.resources === 1 ? 'resource' : 'resources'}</span
 					>
 				</div>
-			</article>
+			</a>
 		{/each}
 	</div>
 {:else}

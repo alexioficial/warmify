@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import PollingData from '$lib/components/PollingData.svelte';
 	import ProjectGrid from '$lib/components/ProjectGrid.svelte';
@@ -6,6 +7,20 @@
 	import { versionLabel } from '$lib/resource-presenter';
 
 	let { data } = $props();
+	let refreshed = $state<{ value: typeof data }>();
+	const dashboard = $derived(refreshed ? refreshed.value : data);
+
+	onMount(() => {
+		void fetch('/internal/poll/dashboard')
+			.then((response) => {
+				if (!response.ok) throw new Error('Dashboard synchronization failed');
+				return response.json();
+			})
+			.then((value) => {
+				refreshed = { value };
+			})
+			.catch(() => undefined);
+	});
 </script>
 
 <svelte:head><title>Dashboard - Warmify</title></svelte:head>
@@ -13,7 +28,7 @@
 <div class="page-header">
 	<div>
 		<h1>Dashboard</h1>
-		<p class="muted">Coolify {versionLabel(data.version)}</p>
+		<p class="muted">Coolify {versionLabel(dashboard.version)}</p>
 	</div>
 </div>
 
@@ -25,7 +40,11 @@
 		</div>
 		<a href={resolve('/deployments')}>View all</a>
 	</div>
-	<PollingData initial={data.deployments} url="/internal/poll/deployments/active" interval={5000} />
+	<PollingData
+		initial={dashboard.deployments}
+		url="/internal/poll/deployments/active"
+		interval={5000}
+	/>
 </section>
 
 <section class="dashboard-section">
@@ -36,7 +55,7 @@
 		</div>
 		<a href={resolve('/projects')}>View all</a>
 	</div>
-	<ProjectGrid data={data.projects} />
+	<ProjectGrid data={dashboard.projects} />
 </section>
 
 <section class="dashboard-section">
@@ -47,5 +66,5 @@
 		</div>
 		<a href={resolve('/servers')}>View all</a>
 	</div>
-	<DataTable data={data.servers} detailGroup="servers" />
+	<DataTable data={dashboard.servers} detailGroup="servers" />
 </section>

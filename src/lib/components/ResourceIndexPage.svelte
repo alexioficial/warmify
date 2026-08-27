@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import DeploymentTable from '$lib/components/DeploymentTable.svelte';
 	import ProjectGrid from '$lib/components/ProjectGrid.svelte';
@@ -17,6 +18,20 @@
 		};
 		form?: { error?: string; message?: string; name?: string } | null;
 	} = $props();
+	let refreshed = $state<{ value: unknown }>();
+	const content = $derived(refreshed ? refreshed.value : data.data);
+
+	onMount(() => {
+		void fetch(`/internal/poll/collections/${encodeURIComponent(data.group)}`)
+			.then((response) => {
+				if (!response.ok) throw new Error('Collection synchronization failed');
+				return response.json();
+			})
+			.then((value) => {
+				refreshed = { value };
+			})
+			.catch(() => undefined);
+	});
 </script>
 
 <svelte:head><title>{data.title} - Warmify</title></svelte:head>
@@ -48,13 +63,13 @@
 {#if form?.message}<p role="status">{form.message}</p>{/if}
 
 {#if data.group === 'projects'}
-	<ProjectGrid data={data.data} searchable />
+	<ProjectGrid data={content} searchable />
 {:else if data.group === 'deployments'}
-	<DeploymentTable data={data.data} />
+	<DeploymentTable data={content} />
 {:else if data.group === 'system'}
 	<dl class="overview">
 		<dt>Coolify version</dt>
-		<dd>{versionLabel(data.data)}</dd>
+		<dd>{versionLabel(content)}</dd>
 	</dl>
 	<h2>API access</h2>
 	<form class="actions" method="POST" action="?/systemAction">
@@ -78,7 +93,7 @@
 	</details>
 {:else}
 	<DataTable
-		data={data.data}
+		data={content}
 		detailGroup={data.detailPath ? data.group : undefined}
 		displayGroup={data.group}
 		searchable

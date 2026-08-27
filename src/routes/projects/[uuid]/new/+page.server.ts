@@ -3,6 +3,7 @@ import { error, fail, redirect } from '@sveltejs/kit';
 import { asRecord, firstText, normalizeRecords } from '$lib/resource-presenter';
 import { detailPath } from '$lib/resource-routes';
 import { CoolifyError } from '$lib/server/coolify-client';
+import { collectionForPage, invalidateCollection } from '$lib/server/inventory-cache';
 import { redactSecrets } from '$lib/server/redact';
 import { newResourceRequest } from '$lib/server/resource-actions';
 import { audit, getCoolifyClient } from '$lib/server/runtime';
@@ -29,8 +30,8 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 	const [project, environments, servers, destinations] = await Promise.all([
 		safeGet(`/projects/${uuid}`, null),
 		safeGet(`/projects/${uuid}/environments`, []),
-		safeGet('/servers', []),
-		safeGet('/destinations', [])
+		collectionForPage('servers').catch(() => []),
+		collectionForPage('destinations').catch(() => [])
 	]);
 	if (!project) error(404, 'Project not found');
 	return {
@@ -126,6 +127,9 @@ export const actions: Actions = {
 				duration_ms: Date.now() - started
 			});
 			const uuid = firstText(asRecord(result), ['uuid', 'id']);
+			invalidateCollection(creation.group);
+			invalidateCollection('resources');
+			invalidateCollection('projects');
 			if (!uuid) return { message: 'Resource created', values: {} };
 			redirectTarget = detailPath(creation.group, uuid) ?? '/projects';
 		} catch (caught) {

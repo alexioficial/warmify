@@ -1,6 +1,6 @@
 # Warmify
 
-Warmify is a small, server-rendered administrative wrapper for the public Coolify API. Coolify remains the only source of truth; Warmify stores no resources or users in a database and never sends the Coolify API token to the browser.
+Warmify is a small, server-rendered administrative wrapper for the public Coolify API. Coolify remains the source of truth; Warmify stores only disposable inventory snapshots in SQLite to accelerate page loads, never users or independently managed resources, and never sends the Coolify API token to the browser.
 
 ## Configuration
 
@@ -12,6 +12,7 @@ Copy `.env.example` to `.env` and set:
 - `WARMIFY_ADMIN_PASSWORD`: the Warmify login password in plain text, as requested. Protect the `.env` file with operating-system permissions and do not commit it.
 - `WARMIFY_SESSION_TTL_HOURS`: session lifetime; defaults to 12 hours.
 - `WARMIFY_REQUEST_TIMEOUT_MS`: upstream request timeout; defaults to 15000 ms.
+- `WARMIFY_DATA_DIR`: directory that contains the SQLite cache; defaults to `.warmify-data` and should be `/data` in Coolify.
 
 Warmify derives its cookie-signing key internally from `WARMIFY_ADMIN_PASSWORD`; changing the password invalidates existing sessions. Deploy behind HTTPS so production session cookies can use the `Secure` flag.
 
@@ -60,3 +61,9 @@ The public Coolify API is version-dependent. Warmify displays the connected vers
 ## Production image
 
 The included multi-stage `dockerfile` builds the SvelteKit Node adapter output and runs it with Bun on port 3000. Supply the environment variables at runtime rather than baking `.env` into the image.
+
+### Persistent SQLite cache in Coolify
+
+Set `WARMIFY_DATA_DIR=/data`, then add Persistent Storage to the Warmify application with a volume mounted at `/data`. Mount the directory, not the individual database file. Warmify creates `/data/warmify.sqlite` and its WAL files automatically.
+
+Use a single Warmify replica while using SQLite. The database contains only redacted inventory snapshots and can be deleted and rebuilt from Coolify at any time. Dashboard, global search and every collection page render cached data first, start a Coolify synchronization, write the result back to SQLite and update the visible page when synchronization finishes. The first Dashboard visit also warms missing collection snapshots in the background so subsequent navigation is immediate. Variables, logs, secret reveal responses and other sensitive detail payloads are never persisted in the cache.

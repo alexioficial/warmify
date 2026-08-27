@@ -2,6 +2,7 @@ import { fail } from '@sveltejs/kit';
 
 import { CoolifyError } from '$lib/server/coolify-client';
 import { endpointManifest, getEndpoint } from '$lib/server/endpoint-manifest';
+import { invalidateAllCollections } from '$lib/server/inventory-cache';
 import { executeOperation, formDataToOperationInput } from '$lib/server/operations';
 import { audit, getCoolifyClient } from '$lib/server/runtime';
 
@@ -23,6 +24,7 @@ export const actions: Actions = {
 			if (endpoint.group !== params.group)
 				return fail(400, { error: 'Operation does not belong to this group.' });
 			const result = await executeOperation(getCoolifyClient(), input);
+			if (endpoint.method !== 'GET') invalidateAllCollections();
 			audit({
 				user: locals.user?.username,
 				operation: operationId,

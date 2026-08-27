@@ -1,15 +1,15 @@
+import { collectionForPage } from '$lib/server/inventory-cache';
 import { redactSecrets } from '$lib/server/redact';
-import { getCoolifyClient } from '$lib/server/runtime';
 
 import type { PageServerLoad } from './$types';
 
 const searchable = [
-	['projects', '/projects'],
-	['applications', '/applications'],
-	['services', '/services'],
-	['databases', '/databases'],
-	['servers', '/servers'],
-	['destinations', '/destinations']
+	'projects',
+	'applications',
+	'services',
+	'databases',
+	'servers',
+	'destinations'
 ] as const;
 
 export const load: PageServerLoad = async ({ url, setHeaders }) => {
@@ -18,9 +18,9 @@ export const load: PageServerLoad = async ({ url, setHeaders }) => {
 	if (!query) return { query, results: [] };
 	const normalized = query.toLowerCase();
 	const groups = await Promise.all(
-		searchable.map(async ([group, path]) => {
+		searchable.map(async (group) => {
 			try {
-				const value = await getCoolifyClient().request('GET', path);
+				const value = await collectionForPage(group);
 				return Array.isArray(value)
 					? value
 							.filter((item) =>
