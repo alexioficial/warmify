@@ -47,5 +47,8 @@ export function collectionPath(group: string): CollectionPath | undefined {
 export function detailPath(group: string, identifier: string): DetailPath | undefined {
 	const collection = collectionPath(group);
 	if (!collection || !DETAIL_GROUPS.has(group)) return undefined;
+	if (group === 'applications') {
+		return `${collection}/${encodeURIComponent(identifier)}/general` as DetailPath;
+	}
 	return `${collection}/${encodeURIComponent(identifier)}` as DetailPath;
 }

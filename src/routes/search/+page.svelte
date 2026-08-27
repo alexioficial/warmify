@@ -22,7 +22,7 @@
 							detailPath(result.group, String(result.item.uuid ?? result.item.id)) ?? '/'
 						)}>{String(result.item.name ?? result.item.uuid ?? result.item.id)}</a
 					>
-					— {result.group}
+					- {result.group}
 				</li>
 			{/each}
 		</ul>

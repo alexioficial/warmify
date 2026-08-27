@@ -4,21 +4,64 @@
 	import { beforeNavigate, goto, pushState, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { navigating, page } from '$app/state';
+	import { onMount } from 'svelte';
 	import '../app.css';
+
+	interface Breadcrumb {
+		label: string;
+		href: string;
+	}
 
 	let { children, data } = $props();
 	let earlyNavigation = $state<URL | null>(null);
 	let committingEarlyNavigation = false;
+	let repairingHistory = false;
+	let historyRepairGeneration = 0;
 	const activePath = $derived(
 		earlyNavigation?.pathname ?? navigating.to?.url.pathname ?? page.url.pathname
 	);
 	const loadingPage = $derived(earlyNavigation !== null || navigating.to !== null);
-	const breadcrumbs = $derived(
-		activePath
-			.split('/')
-			.filter(Boolean)
-			.map((segment) => decodeURIComponent(segment).replaceAll('-', ' '))
+	const routeBreadcrumbs = $derived.by(() => {
+		const result: Breadcrumb[] = [];
+		const parts = activePath.split('/').filter(Boolean);
+		let href = '';
+		for (const segment of parts) {
+			href += `/${segment}`;
+			if (['environments', 'new'].includes(segment)) continue;
+			result.push({
+				label: decodeURIComponent(segment).replaceAll('-', ' '),
+				href
+			});
+		}
+		return result;
+	});
+	const dataBreadcrumbs = $derived(
+		Array.isArray(page.data.breadcrumbs)
+			? page.data.breadcrumbs
+					.map((item) => {
+						if (typeof item === 'string') return { label: item, href: page.url.pathname };
+						if (
+							item &&
+							typeof item === 'object' &&
+							typeof item.label === 'string' &&
+							typeof item.href === 'string'
+						) {
+							return { label: item.label, href: item.href };
+						}
+					})
+					.filter((item): item is Breadcrumb => item !== undefined)
+			: []
 	);
+	const breadcrumbs = $derived.by(() => {
+		if (!earlyNavigation) return dataBreadcrumbs.length ? dataBreadcrumbs : routeBreadcrumbs;
+
+		const targetPath = earlyNavigation.pathname.replace(/\/$/, '') || '/';
+		const preserved = dataBreadcrumbs.filter((breadcrumb) => {
+			const href = breadcrumb.href.replace(/\/$/, '') || '/';
+			return targetPath === href || targetPath.startsWith(`${href}/`);
+		});
+		return preserved.length ? preserved : routeBreadcrumbs.slice(0, 1);
+	});
 
 	function current(href: string): 'page' | undefined {
 		return href === '/'
@@ -37,6 +80,8 @@
 			navigation.willUnload ||
 			!navigation.to ||
 			navigation.to.route.id === null ||
+			(navigation.to.url.pathname === page.url.pathname &&
+				navigation.to.url.search === page.url.search) ||
 			navigation.to.url.href === page.url.href
 		) {
 			return;
@@ -62,6 +107,30 @@
 				committingEarlyNavigation = false;
 			});
 	});
+
+	onMount(() => {
+		function repairShallowHistory() {
+			queueMicrotask(() => {
+				if (navigating.to && !repairingHistory) return;
+				const generation = ++historyRepairGeneration;
+				repairingHistory = true;
+				committingEarlyNavigation = true;
+				const target = new URL(location.href);
+				earlyNavigation = target;
+				void goto(target, { replaceState: true, invalidateAll: true, state: page.state })
+					.catch(() => undefined)
+					.finally(() => {
+						if (generation !== historyRepairGeneration) return;
+						earlyNavigation = null;
+						committingEarlyNavigation = false;
+						repairingHistory = false;
+					});
+			});
+		}
+
+		addEventListener('popstate', repairShallowHistory);
+		return () => removeEventListener('popstate', repairShallowHistory);
+	});
 </script>
 
 <svelte:head>
@@ -81,7 +150,6 @@
 				<a href={resolve('/')} aria-current={current('/')}>Dashboard</a>
 				<a href={resolve('/projects')} aria-current={current('/projects')}>Projects</a>
 				<a href={resolve('/deployments')} aria-current={current('/deployments')}>Deployments</a>
-				<a href={resolve('/resources')} aria-current={current('/resources')}>All resources</a>
 
 				<p class="nav-heading">- Infrastructure -</p>
 				<a href={resolve('/servers')} aria-current={current('/servers')}>Servers</a>
@@ -102,9 +170,11 @@
 		<div class="workspace">
 			<header class="topbar">
 				<div class="breadcrumbs" aria-label="Breadcrumb">
-					<span>Root Team</span>
+					<a href={resolve('/')}>Root Team</a>
 					{#each breadcrumbs as breadcrumb, index (index)}
-						<span aria-hidden="true">/</span><span class="breadcrumb-value">{breadcrumb}</span>
+						<span aria-hidden="true">/</span><a class="breadcrumb-value" href={breadcrumb.href}
+							>{breadcrumb.label}</a
+						>
 					{/each}
 				</div>
 			</header>

@@ -8,7 +8,15 @@ export interface ContextualRequest {
 }
 
 export interface NewResourceInput {
-	kind: 'public-repository' | 'docker-image' | 'service' | 'database';
+	kind:
+		| 'public-repository'
+		| 'private-deploy-key'
+		| 'github-app'
+		| 'dockerfile'
+		| 'docker-compose'
+		| 'docker-image'
+		| 'service'
+		| 'database';
 	projectUuid: string;
 	serverUuid: string;
 	environmentUuid: string;
@@ -95,6 +103,36 @@ export function newResourceRequest(input: NewResourceInput): {
 			ports_exposes: input.fields.ports_exposes,
 			domains: input.fields.domains
 		};
+	} else if (input.kind === 'private-deploy-key') {
+		group = 'applications';
+		endpointId = 'POST:/applications/private-deploy-key';
+		specific = {
+			private_key_uuid: input.fields.private_key_uuid,
+			git_repository: input.fields.git_repository,
+			git_branch: input.fields.git_branch,
+			build_pack: input.fields.build_pack,
+			ports_exposes: input.fields.ports_exposes,
+			domains: input.fields.domains
+		};
+	} else if (input.kind === 'github-app') {
+		group = 'applications';
+		endpointId = 'POST:/applications/private-github-app';
+		specific = {
+			github_app_uuid: input.fields.github_app_uuid,
+			git_repository: input.fields.git_repository,
+			git_branch: input.fields.git_branch,
+			build_pack: input.fields.build_pack,
+			ports_exposes: input.fields.ports_exposes,
+			domains: input.fields.domains
+		};
+	} else if (input.kind === 'dockerfile') {
+		group = 'applications';
+		endpointId = 'POST:/applications/dockerfile';
+		specific = { dockerfile: input.fields.dockerfile };
+	} else if (input.kind === 'docker-compose') {
+		group = 'services';
+		endpointId = 'POST:/services';
+		specific = { docker_compose_raw: input.fields.docker_compose_raw };
 	} else if (input.kind === 'docker-image') {
 		group = 'applications';
 		endpointId = 'POST:/applications/dockerimage';

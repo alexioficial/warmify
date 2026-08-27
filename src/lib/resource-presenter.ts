@@ -35,6 +35,28 @@ export interface ProjectEnvironment {
 	resources: ProjectResource[];
 }
 
+const ENVIRONMENT_RESOURCE_GROUPS: ReadonlyArray<{
+	group: ProjectResource['group'];
+	keys: readonly string[];
+}> = [
+	{ group: 'applications', keys: ['applications'] },
+	{ group: 'services', keys: ['services'] },
+	{
+		group: 'databases',
+		keys: [
+			'databases',
+			'postgresqls',
+			'mysqls',
+			'mariadbs',
+			'mongodbs',
+			'redis',
+			'keydbs',
+			'dragonflies',
+			'clickhouses'
+		]
+	}
+];
+
 export interface EnvironmentVariableSummary {
 	id: string;
 	key: string;
@@ -95,7 +117,7 @@ export function humanize(value: unknown): string {
 			const words = part.replaceAll('_', ' ').replaceAll('-', ' ').toLowerCase();
 			return index === 0 ? words.replace(/^./, (character) => character.toUpperCase()) : words;
 		})
-		.join(' · ');
+		.join(' - ');
 }
 
 export function resourceSummary(value: unknown, group: string): ResourceSummary {
@@ -114,7 +136,7 @@ export function resourceSummary(value: unknown, group: string): ResourceSummary 
 	const environment =
 		nestedText(record, 'environment', ['name']) || firstText(record, ['environment_name']);
 	const server = nestedText(record, 'server', ['name']) || firstText(record, ['server_name']);
-	const context = [environment, server].filter(Boolean).join(' · ');
+	const context = [environment, server].filter(Boolean).join(' - ');
 	const description = firstText(record, [
 		'description',
 		'fqdn',
@@ -154,11 +176,7 @@ export function projectStats(value: unknown): ProjectStats {
 	const explicitEnvironments = Number(firstText(record, ['environments_count']));
 	const explicitResources = Number(firstText(record, ['resources_count']));
 	const resources = environments.reduce(
-		(total, environment) =>
-			total +
-			normalizeRecords(environment.applications).length +
-			normalizeRecords(environment.services).length +
-			normalizeRecords(environment.databases).length,
+		(total, environment) => total + environmentResources(environment).length,
 		0
 	);
 	return {
@@ -181,8 +199,8 @@ export function environmentVariableSummary(value: unknown): EnvironmentVariableS
 	return {
 		id: firstText(record, ['uuid', 'id', 'key']),
 		key: firstText(record, ['key']) || 'Unnamed variable',
-		value: firstText(record, ['value']) || '—',
-		scope: scopes.join(' · ') || 'Runtime'
+		value: firstText(record, ['value']) || '-',
+		scope: scopes.join(' - ') || 'Runtime'
 	};
 }
 
@@ -204,12 +222,7 @@ export function projectEnvironments(value: unknown): ProjectEnvironment[] {
 	const project = asRecord(value);
 	const environments = normalizeRecords(project?.environments ?? value);
 	return environments.map((environment, index) => {
-		const resources: ProjectResource[] = [];
-		for (const group of ['applications', 'services', 'databases'] as const) {
-			for (const resource of normalizeRecords(environment[group])) {
-				resources.push({ ...resourceSummary(resource, group), group });
-			}
-		}
+		const resources = environmentResources(environment);
 		return {
 			id: firstText(environment, ['uuid', 'id']) || String(index),
 			name: firstText(environment, ['name']) || 'Environment',
@@ -217,6 +230,25 @@ export function projectEnvironments(value: unknown): ProjectEnvironment[] {
 			resources
 		};
 	});
+}
+
+export function environmentResources(value: unknown): ProjectResource[] {
+	const environment = asRecord(value);
+	if (!environment) return [];
+	const resources: ProjectResource[] = [];
+	const seen = new Set<string>();
+	for (const { group, keys } of ENVIRONMENT_RESOURCE_GROUPS) {
+		for (const key of keys) {
+			for (const resource of normalizeRecords(environment[key])) {
+				const summary = resourceSummary(resource, group);
+				const identity = `${group}:${summary.id || summary.name}`;
+				if (seen.has(identity)) continue;
+				seen.add(identity);
+				resources.push({ ...summary, group });
+			}
+		}
+	}
+	return resources;
 }
 
 export function additionalData(value: unknown, knownKeys: readonly string[]): ResourceRecord {
@@ -227,7 +259,7 @@ export function additionalData(value: unknown, knownKeys: readonly string[]): Re
 }
 
 export function formatTimestamp(value: unknown): string {
-	if (typeof value !== 'string' || !value) return '—';
+	if (typeof value !== 'string' || !value) return '-';
 	const timestamp = new Date(value);
 	if (Number.isNaN(timestamp.getTime())) return value;
 	return new Intl.DateTimeFormat('en', {
@@ -237,7 +269,7 @@ export function formatTimestamp(value: unknown): string {
 }
 
 export function formatRelativeTime(value: unknown, now = new Date()): string {
-	if (typeof value !== 'string' || !value) return '—';
+	if (typeof value !== 'string' || !value) return '-';
 	const timestamp = new Date(value);
 	if (Number.isNaN(timestamp.getTime())) return value;
 	const seconds = Math.round((timestamp.getTime() - now.getTime()) / 1000);

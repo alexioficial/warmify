@@ -63,7 +63,7 @@ describe('resource presenter', () => {
 		expect(formatRelativeTime('2026-08-26T10:00:00Z', new Date('2026-08-26T12:00:00Z'))).toBe(
 			'2 hours ago'
 		);
-		expect(formatRelativeTime('', new Date('2026-08-26T12:00:00Z'))).toBe('—');
+		expect(formatRelativeTime('', new Date('2026-08-26T12:00:00Z'))).toBe('-');
 	});
 
 	test('summarizes resources by family using deliberate fields', () => {
@@ -83,8 +83,8 @@ describe('resource presenter', () => {
 			id: 'app-1',
 			name: 'Website',
 			description: 'https://example.com',
-			status: 'Running · healthy',
-			context: 'production · Primary',
+			status: 'Running - healthy',
+			context: 'production - Primary',
 			type: 'Application'
 		});
 	});
@@ -121,7 +121,7 @@ describe('resource presenter', () => {
 	test('formats versions and timestamps without exposing raw JSON', () => {
 		expect(versionLabel({ version: '4.0.0-beta.420' })).toBe('4.0.0-beta.420');
 		expect(versionLabel({ error: 'offline' })).toBe('Unavailable');
-		expect(formatTimestamp(undefined)).toBe('—');
+		expect(formatTimestamp(undefined)).toBe('-');
 		expect(formatTimestamp('not-a-date')).toBe('not-a-date');
 	});
 

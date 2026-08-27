@@ -31,7 +31,7 @@
 	);
 
 	function statusClass(status: string): string {
-		return `status status-${status.toLowerCase().split(/[ ·]/)[0]}`;
+		return `status status-${status.toLowerCase().split(/[ -]/)[0]}`;
 	}
 </script>
 
@@ -72,7 +72,7 @@
 							{#if row.summary.description}<br /><small>{row.summary.description}</small>{/if}
 						</td>
 						{#if group === 'servers'}
-							<td>{firstText(row.record, ['ip']) || '—'}</td>
+							<td>{firstText(row.record, ['ip']) || '-'}</td>
 							<td><span class={statusClass(row.summary.status)}>{row.summary.status}</span></td>
 						{:else if group === 'sources'}
 							<td>{firstText(row.record, ['provider', 'type']) || 'GitHub'}</td>
@@ -80,7 +80,7 @@
 						{:else}
 							<td>{row.summary.type}</td>
 							<td><span class={statusClass(row.summary.status)}>{row.summary.status}</span></td>
-							<td>{row.summary.context || '—'}</td>
+							<td>{row.summary.context || '-'}</td>
 						{/if}
 					</tr>
 				{/each}

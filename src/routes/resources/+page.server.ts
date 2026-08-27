@@ -1,5 +1,5 @@
-import { loadResourceIndex } from '$lib/server/resource-index-page';
+import { redirect } from '@sveltejs/kit';
 
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ setHeaders }) => loadResourceIndex('resources', setHeaders);
+export const load: PageServerLoad = () => redirect(303, '/projects');

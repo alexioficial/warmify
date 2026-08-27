@@ -105,6 +105,6 @@ export const resourceGroups: Record<string, ResourceGroupConfig> = {
 		]
 	},
 	teams: { title: 'Teams', listPath: '/teams', detailPath: '/teams/{uuid}' },
-	resources: { title: 'All resources', listPath: '/resources' },
+	resources: { title: 'Resource inventory', listPath: '/resources' },
 	system: { title: 'System', listPath: '/version' }
 };

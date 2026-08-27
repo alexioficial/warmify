@@ -45,7 +45,7 @@
 				</div>
 				<div class="project-stats">
 					<span>{project.stats.environments} env</span>
-					<span>·</span>
+					<span>-</span>
 					<span
 						>{project.stats.resources}
 						{project.stats.resources === 1 ? 'resource' : 'resources'}</span

@@ -1,19 +1,17 @@
 <script lang="ts">
-	import { resolve } from '$app/paths';
 	import AdditionalData from '$lib/components/AdditionalData.svelte';
 	import DataTable from '$lib/components/DataTable.svelte';
 	import DeploymentTable from '$lib/components/DeploymentTable.svelte';
 	import EnvironmentTable from '$lib/components/EnvironmentTable.svelte';
 	import LogViewer from '$lib/components/LogViewer.svelte';
 	import RevealSecret from '$lib/components/RevealSecret.svelte';
+	import { onMount } from 'svelte';
 	import {
 		additionalData,
 		asRecord,
 		firstText,
-		projectEnvironments,
 		resourceSummary
 	} from '$lib/resource-presenter';
-	import { detailPath } from '$lib/resource-routes';
 
 	interface ConfigurationField {
 		name: string;
@@ -55,17 +53,14 @@
 		data,
 		form
 	}: { data: ResourceDetailData; form?: { error?: string; message?: string } | null } = $props();
+	let activeSection = $state('overview');
 	const record = $derived(asRecord(data.data));
 	const related = $derived((data.related ?? {}) as Record<string, unknown>);
 	const summary = $derived(resourceSummary(data.data, data.group));
-	const environments = $derived(
-		projectEnvironments({ environments: related.environments ?? record?.environments })
-	);
-	const variableGroups = new Set(['projects', 'applications', 'services', 'databases', 'servers']);
+	const variableGroups = new Set(['applications', 'services', 'databases', 'servers']);
 	const lifecycleGroups = new Set(['applications', 'services', 'databases']);
 	const settingsNavGroups = new Set(['applications', 'services', 'databases']);
 	const deletableGroups = new Set([
-		'projects',
 		'applications',
 		'services',
 		'databases',
@@ -128,7 +123,7 @@
 	}
 
 	function statusClass(status: string): string {
-		return `status status-${status.toLowerCase().split(/[ ·]/)[0]}`;
+		return `status status-${status.toLowerCase().split(/[ -]/)[0]}`;
 	}
 
 	function confirmLifecycle(event: MouseEvent, action: string) {
@@ -144,6 +139,20 @@
 			databases: 'database-logs'
 		}[data.group];
 	}
+
+	function selectSection(section: string) {
+		activeSection = section;
+	}
+
+	onMount(() => {
+		function syncSection() {
+			activeSection = location.hash.slice(1) || 'overview';
+		}
+
+		syncSection();
+		addEventListener('hashchange', syncSection);
+		return () => removeEventListener('hashchange', syncSection);
+	});
 </script>
 
 <svelte:head><title>{summary.name} - Warmify</title></svelte:head>
@@ -187,17 +196,17 @@
 	<div class:resource-layout={settingsNavGroups.has(data.group)}>
 		{#if settingsNavGroups.has(data.group)}
 			<nav class="resource-nav" aria-label="Resource settings">
-				<p class="nav-heading">Settings</p>
-				<a href="#overview">General</a>
+				<p class="nav-heading">- Settings -</p>
+				<a href="#overview" aria-current={activeSection === 'overview' ? 'location' : undefined} onclick={() => selectSection('overview')}>General</a>
 				{#each configurationGroups as group (group.id)}
-					<a href={`#${group.id}`}>{group.title}</a>
+					<a href={`#${group.id}`} aria-current={activeSection === group.id ? 'location' : undefined} onclick={() => selectSection(group.id)}>{group.title}</a>
 				{/each}
-				{#if variableGroups.has(data.group)}<a href="#variables">Environment variables</a>{/if}
-				{#if related.storages}<a href="#storage">Persistent storage</a>{/if}
-				{#if related.tasks}<a href="#tasks">Scheduled tasks</a>{/if}
-				<p class="nav-heading">Observe & troubleshoot</p>
-				{#if related.deployments}<a href="#deployments">Deployments</a>{/if}
-				{#if related.logs !== undefined || record.logs}<a href="#logs">Runtime logs</a>{/if}
+				{#if variableGroups.has(data.group)}<a href="#variables" aria-current={activeSection === 'variables' ? 'location' : undefined} onclick={() => selectSection('variables')}>Environment variables</a>{/if}
+				{#if related.storages}<a href="#storage" aria-current={activeSection === 'storage' ? 'location' : undefined} onclick={() => selectSection('storage')}>Persistent storage</a>{/if}
+				{#if related.tasks}<a href="#tasks" aria-current={activeSection === 'tasks' ? 'location' : undefined} onclick={() => selectSection('tasks')}>Scheduled tasks</a>{/if}
+				<p class="nav-heading">- Observe & troubleshoot -</p>
+				{#if related.deployments}<a href="#deployments" aria-current={activeSection === 'deployments' ? 'location' : undefined} onclick={() => selectSection('deployments')}>Deployments</a>{/if}
+				{#if related.logs !== undefined || record.logs}<a href="#logs" aria-current={activeSection === 'logs' ? 'location' : undefined} onclick={() => selectSection('logs')}>Runtime logs</a>{/if}
 			</nav>
 		{/if}
 
@@ -231,59 +240,6 @@
 						</dd>{/if}
 				</dl>
 			</section>
-
-			{#if data.group === 'projects'}
-				<section id="environments">
-					<div class="section-heading">
-						<div>
-							<h2>Environments</h2>
-							<p class="muted">Resources grouped by deployment environment</p>
-						</div>
-						<div class="actions">
-							<a
-								class="button primary"
-								href={resolve(`/projects/${encodeURIComponent(data.uuid)}/new`)}>New resource</a
-							>
-							<details>
-								<summary>Add environment</summary>
-								<form method="POST" action="?/createEnvironment">
-									<label>Name <input name="name" placeholder="production" required /></label>
-									<label>Description <textarea name="description"></textarea></label>
-									<button class="primary" type="submit">Create environment</button>
-								</form>
-							</details>
-						</div>
-					</div>
-					{#each environments as environment (environment.id)}
-						<article class="environment-panel">
-							<header>
-								<h3>{environment.name}</h3>
-								<p class="muted">
-									{environment.resources.length}
-									{environment.resources.length === 1 ? 'resource' : 'resources'}
-								</p>
-							</header>
-							{#if environment.resources.length}
-								<ul class="resource-list">
-									{#each environment.resources as resource (resource.id)}
-										<li>
-											<a href={resolve(detailPath(resource.group, resource.id) ?? '/')}
-												>{resource.name}</a
-											>
-											<span>{resource.type}</span>
-											<span class={statusClass(resource.status)}>{resource.status}</span>
-										</li>
-									{/each}
-								</ul>
-							{:else}
-								<p class="muted">No resources in this environment.</p>
-							{/if}
-						</article>
-					{:else}
-						<p class="muted">No environments found.</p>
-					{/each}
-				</section>
-			{/if}
 
 			{#if data.group === 'services'}
 				<section>
