@@ -5,11 +5,11 @@
 	let { data } = $props();
 	const record = $derived(asRecord(data.application));
 	const summary = $derived(resourceSummary(data.application, 'applications'));
-	const knownKeys = [
+	const knownKeys = $derived([
 		'uuid', 'id', 'name', 'description', 'status', 'health', 'fqdn', 'git_repository',
 		'git_branch', 'environment', 'environment_name', 'server', 'server_name',
 		...data.configurationFields.map((field: { name: string }) => field.name)
-	];
+	]);
 	const extra = $derived(additionalData(data.application, knownKeys));
 	const nested = (name: string) => firstText(asRecord(record?.[name]), ['name', 'uuid', 'id']);
 </script>

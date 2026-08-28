@@ -5,7 +5,10 @@
 
 	let { data, form } = $props();
 	let search = $state('');
-	let environmentData = $state(data.environments);
+	let environmentData = $state<unknown>();
+	$effect(() => {
+		environmentData = data.environments;
+	});
 	const environments = $derived(
 		normalizeRecords(environmentData).filter((environment) =>
 			firstText(environment, ['name']).toLowerCase().includes(search.trim().toLowerCase())
@@ -37,7 +40,7 @@
 	<div>
 		<h1>{data.projectName}</h1>
 		<p class="muted">
-			{environmentData.length} {environmentData.length === 1 ? 'environment' : 'environments'} in
+			{environments.length} {environments.length === 1 ? 'environment' : 'environments'} in
 			this project
 		</p>
 	</div>

@@ -41,7 +41,15 @@ export async function loadApplication(uuid: string) {
 	}
 }
 
-export async function loadApplicationRelated(uuid: string, path: string, key: string) {
+type RelatedPageData<Key extends string> = Partial<Record<Key, unknown>> & {
+	requestError?: string;
+};
+
+export async function loadApplicationRelated<Key extends string>(
+	uuid: string,
+	path: string,
+	key: Key
+): Promise<RelatedPageData<Key>> {
 	try {
 		return {
 			[key]: redactSecrets(
@@ -50,8 +58,8 @@ export async function loadApplicationRelated(uuid: string, path: string, key: st
 					path.replace('{uuid}', encodeURIComponent(uuid))
 				)
 			)
-		};
+		} as RelatedPageData<Key>;
 	} catch (caught) {
-		return { [key]: undefined, requestError: message(caught) };
+		return { [key]: undefined, requestError: message(caught) } as RelatedPageData<Key>;
 	}
 }

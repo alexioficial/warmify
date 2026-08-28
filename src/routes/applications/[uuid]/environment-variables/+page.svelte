@@ -2,13 +2,14 @@
 	import EnvironmentTable from '$lib/components/EnvironmentTable.svelte';
 	import RevealSecret from '$lib/components/RevealSecret.svelte';
 	let { data } = $props();
+	const revealOperation = 'GET:/applications/{uuid}/envs';
 </script>
 <svelte:head><title>Environment variables - {data.applicationName} - Warmify</title></svelte:head>
 {#if data.requestError}<p class="error" role="alert">{data.requestError}</p>{/if}
 <section>
 	<div class="section-heading">
 		<h2>Environment variables</h2>
-		<RevealSecret operationId="GET:/applications/{uuid}/envs" parameters={{ uuid: data.uuid }} />
+		<RevealSecret operationId={revealOperation} parameters={{ uuid: data.uuid }} />
 	</div>
 	<EnvironmentTable data={data.variables} />
 	<details>

@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { firstText, normalizeRecords, resourceSummary } from '$lib/resource-presenter';
+	import { asRecord, firstText, normalizeRecords, resourceSummary } from '$lib/resource-presenter';
 
 	let { data, form } = $props();
-	const values = $derived((form?.values ?? {}) as Record<string, string>);
+	const values = $derived(
+		(asRecord(asRecord(form)?.values) ?? {}) as Record<string, string>
+	);
 	const servers = $derived(normalizeRecords(data.servers));
 	const destinations = $derived(normalizeRecords(data.destinations));
 	const privateKeys = $derived(normalizeRecords(data.privateKeys));
@@ -23,7 +25,7 @@
 		'private-deploy-key': 'Private Git Repository (with Deploy Key)',
 		'github-app': 'Git Repository (with GitHub App)',
 		'gitlab-app': 'Git Repository (with GitLab App)',
-		dockerfile: 'Dockerfile',
+		'dockerfile': 'Dockerfile',
 		'docker-compose': 'Docker Compose',
 		'docker-image': 'Docker Image',
 		...databaseNames
