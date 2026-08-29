@@ -45,7 +45,8 @@ function statusFor(caught: unknown): number {
 }
 
 function checkedKind(kind: string): string {
-	if (!APPLICATION_KINDS.has(kind) && !DATABASE_ENGINES.has(kind)) error(404, 'Resource type not found');
+	if (!APPLICATION_KINDS.has(kind) && !DATABASE_ENGINES.has(kind))
+		error(404, 'Resource type not found');
 	return kind;
 }
 

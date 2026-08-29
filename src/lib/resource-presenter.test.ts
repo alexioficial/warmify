@@ -13,6 +13,7 @@ import {
 	resourceSummary,
 	versionLabel
 } from './resource-presenter';
+import * as resourcePresenter from './resource-presenter';
 
 describe('resource presenter', () => {
 	test('normalizes plain arrays and common API response wrappers', () => {
@@ -142,5 +143,41 @@ describe('resource presenter', () => {
 		});
 		expect(logText({ logs: 'line one\nline two' })).toBe('line one\nline two');
 		expect(logText([{ output: 'first' }, { message: 'second' }])).toBe('first\nsecond');
+	});
+
+	test('resolves an application back to its project and environment hierarchy', () => {
+		const applicationHierarchy = (
+			resourcePresenter as typeof resourcePresenter & {
+				applicationHierarchy?: (
+					application: unknown,
+					projects: unknown
+				) =>
+					| {
+							projectUuid: string;
+							projectName: string;
+							environmentUuid: string;
+							environmentName: string;
+					  }
+					| undefined;
+			}
+		).applicationHierarchy;
+		expect(applicationHierarchy).toBeTypeOf('function');
+		if (!applicationHierarchy) return;
+
+		expect(
+			applicationHierarchy({ uuid: 'app-1', environment_id: 22 }, [
+				{ uuid: 'project-1', name: 'Other', environments: [{ id: 10, uuid: 'env-1' }] },
+				{
+					uuid: 'project-2',
+					name: 'Warmify',
+					environments: [{ id: 22, uuid: 'env-2', name: 'production' }]
+				}
+			])
+		).toEqual({
+			projectUuid: 'project-2',
+			projectName: 'Warmify',
+			environmentUuid: 'env-2',
+			environmentName: 'production'
+		});
 	});
 });

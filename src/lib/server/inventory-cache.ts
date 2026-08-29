@@ -23,11 +23,7 @@ function collectionKey(groupName: string): string {
 	return groupName === 'projects' ? PROJECTS_KEY : `collection:${groupName}`;
 }
 
-function synchronizeCached<T>(
-	key: string,
-	force: boolean,
-	refresh: () => Promise<T>
-): Promise<T> {
+function synchronizeCached<T>(key: string, force: boolean, refresh: () => Promise<T>): Promise<T> {
 	const cached = readCache<T>(key);
 	if (!force && cached && Date.now() - cached.updatedAt < RECENT_SYNC_MS) {
 		return Promise.resolve(cached.value);
@@ -36,8 +32,7 @@ function synchronizeCached<T>(
 	if (active) return active as Promise<T>;
 
 	const generation = cacheGenerations.get(key) ?? 0;
-	let synchronization: Promise<T>;
-	synchronization = refresh()
+	const synchronization = refresh()
 		.then((value) => {
 			if ((cacheGenerations.get(key) ?? 0) === generation) writeCache(key, value);
 			return value;

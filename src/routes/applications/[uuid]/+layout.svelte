@@ -1,27 +1,14 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { resourceSummary } from '$lib/resource-presenter';
+	import { applicationNavigation } from '$lib/resource-routes';
 
 	let { data, children } = $props();
 	const summary = $derived(resourceSummary(data.application, 'applications'));
 	const basePath = $derived(`/applications/${encodeURIComponent(data.uuid)}`);
 	const actionResult = $derived(page.form as { error?: string; message?: string } | null);
-
-	const settings = [
-		{ slug: 'general', label: 'General' },
-		{ slug: 'application-details', label: 'Application details' },
-		{ slug: 'access', label: 'Access' },
-		{ slug: 'build-pipeline', label: 'Build pipeline' },
-		{ slug: 'networking', label: 'Networking' },
-		{ slug: 'healthcheck', label: 'Healthcheck' },
-		{ slug: 'environment-variables', label: 'Environment variables' },
-		{ slug: 'persistent-storage', label: 'Persistent storage' },
-		{ slug: 'scheduled-tasks', label: 'Scheduled tasks' }
-	] as const;
-	const observe = [
-		{ slug: 'deployments', label: 'Deployments' },
-		{ slug: 'runtime-logs', label: 'Runtime logs' }
-	] as const;
+	const navigation = $derived(applicationNavigation(data.application));
 
 	function active(slug: string): 'page' | undefined {
 		return page.url.pathname.endsWith(`/${slug}`) ? 'page' : undefined;
@@ -55,8 +42,12 @@
 		</form>
 		<form class="action-form" method="POST" action={`${basePath}/general?/lifecycle`}>
 			<input type="hidden" name="confirmation" value="confirm" />
-			<button name="action" value="restart" onclick={(event) => confirmLifecycle(event, 'restart')}>Restart</button>
-			<button name="action" value="stop" onclick={(event) => confirmLifecycle(event, 'stop')}>Stop</button>
+			<button name="action" value="restart" onclick={(event) => confirmLifecycle(event, 'restart')}
+				>Restart</button
+			>
+			<button name="action" value="stop" onclick={(event) => confirmLifecycle(event, 'stop')}
+				>Stop</button
+			>
 		</form>
 	</div>
 </div>
@@ -68,13 +59,13 @@
 {#if data.application}
 	<div class="resource-layout">
 		<nav class="resource-nav" aria-label="Application settings">
-			<p class="nav-heading">- Settings -</p>
-			{#each settings as item (item.slug)}
-				<a href={`${basePath}/${item.slug}`} aria-current={active(item.slug)}>{item.label}</a>
-			{/each}
-			<p class="nav-heading">- Observe & troubleshoot -</p>
-			{#each observe as item (item.slug)}
-				<a href={`${basePath}/${item.slug}`} aria-current={active(item.slug)}>{item.label}</a>
+			{#each navigation as group (group.label)}
+				<p class="nav-heading">- {group.label} -</p>
+				{#each group.items as item (item.slug)}
+					<a href={resolve(`${basePath}/${item.slug}` as '/')} aria-current={active(item.slug)}
+						>{item.label}</a
+					>
+				{/each}
 			{/each}
 		</nav>
 		<div class="resource-content">{@render children()}</div>

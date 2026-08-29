@@ -1,10 +1,8 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import PageSkeleton from '$lib/components/PageSkeleton.svelte';
-	import { beforeNavigate, goto, pushState, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { navigating, page } from '$app/state';
-	import { onMount } from 'svelte';
 	import '../app.css';
 
 	interface Breadcrumb {
@@ -13,14 +11,8 @@
 	}
 
 	let { children, data } = $props();
-	let earlyNavigation = $state<URL | null>(null);
-	let committingEarlyNavigation = false;
-	let repairingHistory = false;
-	let historyRepairGeneration = 0;
-	const activePath = $derived(
-		earlyNavigation?.pathname ?? navigating.to?.url.pathname ?? page.url.pathname
-	);
-	const loadingPage = $derived(earlyNavigation !== null || navigating.to !== null);
+	const activePath = $derived(navigating.to?.url.pathname ?? page.url.pathname);
+	const loadingPage = $derived(navigating.to !== null);
 	const routeBreadcrumbs = $derived.by(() => {
 		const result: Breadcrumb[] = [];
 		const parts = activePath.split('/').filter(Boolean);
@@ -53,14 +45,7 @@
 			: []
 	);
 	const breadcrumbs = $derived.by(() => {
-		if (!earlyNavigation) return dataBreadcrumbs.length ? dataBreadcrumbs : routeBreadcrumbs;
-
-		const targetPath = earlyNavigation.pathname.replace(/\/$/, '') || '/';
-		const preserved = dataBreadcrumbs.filter((breadcrumb) => {
-			const href = breadcrumb.href.replace(/\/$/, '') || '/';
-			return targetPath === href || targetPath.startsWith(`${href}/`);
-		});
-		return preserved.length ? preserved : routeBreadcrumbs.slice(0, 1);
+		return dataBreadcrumbs.length ? dataBreadcrumbs : routeBreadcrumbs;
 	});
 
 	function current(href: string): 'page' | undefined {
@@ -72,65 +57,6 @@
 				? 'page'
 				: undefined;
 	}
-
-	beforeNavigate((navigation) => {
-		if (
-			committingEarlyNavigation ||
-			navigation.type !== 'link' ||
-			navigation.willUnload ||
-			!navigation.to ||
-			navigation.to.route.id === null ||
-			(navigation.to.url.pathname === page.url.pathname &&
-				navigation.to.url.search === page.url.search) ||
-			navigation.to.url.href === page.url.href
-		) {
-			return;
-		}
-
-		navigation.cancel();
-		committingEarlyNavigation = true;
-
-		const target = new URL(navigation.to.url);
-		const previousUrl = new URL(page.url);
-		const previousState = page.state;
-		earlyNavigation = target;
-		pushState(target, previousState);
-
-		void goto(target, { replaceState: true, state: previousState })
-			.catch(() => {
-				if (location.href === target.href && page.url.href === previousUrl.href) {
-					replaceState(previousUrl, previousState);
-				}
-			})
-			.finally(() => {
-				earlyNavigation = null;
-				committingEarlyNavigation = false;
-			});
-	});
-
-	onMount(() => {
-		function repairShallowHistory() {
-			queueMicrotask(() => {
-				if (navigating.to && !repairingHistory) return;
-				const generation = ++historyRepairGeneration;
-				repairingHistory = true;
-				committingEarlyNavigation = true;
-				const target = new URL(location.href);
-				earlyNavigation = target;
-				void goto(target, { replaceState: true, invalidateAll: true, state: page.state })
-					.catch(() => undefined)
-					.finally(() => {
-						if (generation !== historyRepairGeneration) return;
-						earlyNavigation = null;
-						committingEarlyNavigation = false;
-						repairingHistory = false;
-					});
-			});
-		}
-
-		addEventListener('popstate', repairShallowHistory);
-		return () => removeEventListener('popstate', repairShallowHistory);
-	});
 </script>
 
 <svelte:head>
@@ -172,8 +98,9 @@
 				<div class="breadcrumbs" aria-label="Breadcrumb">
 					<a href={resolve('/')}>Root Team</a>
 					{#each breadcrumbs as breadcrumb, index (index)}
-						<span aria-hidden="true">/</span><a class="breadcrumb-value" href={breadcrumb.href}
-							>{breadcrumb.label}</a
+						<span aria-hidden="true">/</span><a
+							class="breadcrumb-value"
+							href={resolve(breadcrumb.href as '/')}>{breadcrumb.label}</a
 						>
 					{/each}
 				</div>

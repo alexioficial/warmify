@@ -425,7 +425,14 @@ tbody tr:last-child td {
 }
 
 .resource-table tbody tr {
+	position: relative;
 	cursor: pointer;
+}
+
+.resource-table tbody td:first-child a::after {
+	position: absolute;
+	inset: 0;
+	content: '';
 }
 
 .resource-table tbody tr:hover td:first-child a,

@@ -17,7 +17,8 @@ export default defineConfig({
 				COOLIFY_BASE_URL: 'http://127.0.0.1:4010',
 				COOLIFY_API_TOKEN: '1|e2e-secret',
 				WARMIFY_ADMIN_USERNAME: 'admin',
-				WARMIFY_ADMIN_PASSWORD: 'password'
+				WARMIFY_ADMIN_PASSWORD: 'password',
+				WARMIFY_DATA_DIR: './test-results/e2e-data'
 			}
 		}
 	]

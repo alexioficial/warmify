@@ -31,7 +31,8 @@
 			id: 'dockerfile',
 			name: 'Dockerfile',
 			category: 'Docker source',
-			description: 'Create an application directly from Dockerfile content, without a Git repository.'
+			description:
+				'Create an application directly from Dockerfile content, without a Git repository.'
 		},
 		{
 			id: 'docker-compose',

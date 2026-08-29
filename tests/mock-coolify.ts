@@ -32,6 +32,7 @@ const sources = [
 ];
 const environments = [
 	{
+		id: 1,
 		uuid: 'environment-1',
 		name: 'production',
 		description: 'Production resources',
@@ -47,27 +48,42 @@ const environments = [
 		databases: []
 	}
 ];
-const application = {
+let application: Record<string, unknown> = {
 	uuid: 'app-2',
+	environment_id: 1,
 	name: 'Image App',
 	description: 'Created from Docker image',
 	status: 'running:healthy',
-	fqdn: 'https://image.example.com',
+	fqdn: 'https://image.example.com,http://preview.image.example.com/path',
+	noindex_domains: ['http://preview.image.example.com/path'],
+	redirect: 'non-www',
+	build_pack: 'dockerimage',
 	docker_registry_image_name: 'nginx',
 	docker_registry_image_tag: 'latest',
+	custom_docker_run_options: '--memory 512m',
+	max_restart_count: 3,
+	stop_grace_period: 30,
+	is_consistent_container_name_enabled: false,
+	ports_exposes: '80,443',
+	ports_mappings: '8080:80',
+	custom_network_aliases: 'image-app,web',
+	http_basic_auth_password: 'root-password-secret',
+	settings: { is_force_https_enabled: true },
+	destination: { network: 'coolify' },
 	environment: { name: 'production' },
 	server: { name: 'Primary server' }
 };
 
 Bun.serve({
 	port: 4010,
-	fetch(request: Request) {
+	async fetch(request: Request) {
 		if (request.headers.get('Authorization') !== 'Bearer 1|e2e-secret')
 			return Response.json({ message: 'Unauthenticated.' }, { status: 401 });
 		const url = new URL(request.url);
 		const responses: Record<string, unknown> = {
 			'/api/v1/projects': projects,
 			'/api/v1/projects/project-1': { ...projects[0], environments },
+			'/api/v1/projects/project-1/environment-1': environments[0],
 			'/api/v1/projects/project-1/environments': environments,
 			'/api/v1/projects/project-1/envs': [],
 			'/api/v1/servers': servers,
@@ -78,9 +94,18 @@ Bun.serve({
 			'/api/v1/deployments': deployments,
 			'/api/v1/deployments/applications/app-2': [],
 			'/api/v1/version': { version: '4.2.0' },
-			'/api/v1/resources': [],
+			'/api/v1/resources': [{ uuid: 'app-1', environment_id: 1, type: 'application' }],
 			'/api/v1/applications': [],
 			'/api/v1/applications/app-2': application,
+			'/api/v1/applications/app-1': {
+				uuid: 'app-1',
+				environment_id: 1,
+				name: 'Website',
+				status: 'running:healthy',
+				fqdn: 'https://example.com',
+				git_repository: 'widube/website',
+				build_pack: 'railpack'
+			},
 			'/api/v1/applications/app-2/envs': [],
 			'/api/v1/applications/app-2/storages': [],
 			'/api/v1/applications/app-2/scheduled-tasks': [],
@@ -95,6 +120,58 @@ Bun.serve({
 			return Response.json({ uuid: 'app-2' }, { status: 201 });
 		if (request.method === 'POST' && url.pathname === '/api/v1/applications/app-2/start')
 			return Response.json({ message: 'Start queued.' });
+		if (request.method === 'PATCH' && url.pathname === '/api/v1/applications/app-2') {
+			const body = (await request.json()) as Record<string, unknown>;
+			if (body.max_restart_count === 13) {
+				return Response.json(
+					{
+						message: 'The submitted application configuration is invalid.',
+						errors: { max_restart_count: ['Unlucky restart count.'] }
+					},
+					{ status: 422 }
+				);
+			}
+			if (
+				typeof body.domains === 'string' &&
+				body.domains.includes('https://conflict.example.com') &&
+				body.force_domain_override !== true
+			) {
+				return Response.json(
+					{
+						message: 'Domain conflicts detected. Use force_domain_override=true to proceed.',
+						warning: 'The same domain is already in use.',
+						conflicts: [
+							{
+								domain: 'https://conflict.example.com',
+								resource_name: 'Existing site',
+								resource_uuid: 'other-app',
+								resource_type: 'application',
+								message: 'Domain already used'
+							}
+						]
+					},
+					{ status: 409 }
+				);
+			}
+			const domains = body.domains;
+			const isForceHttpsEnabled = body.is_force_https_enabled;
+			const updates = { ...body };
+			delete updates.domains;
+			delete updates.is_force_https_enabled;
+			delete updates.force_domain_override;
+			application = {
+				...application,
+				...updates,
+				...(typeof domains === 'string' ? { fqdn: domains } : {}),
+				settings: {
+					...((application.settings as Record<string, unknown> | undefined) ?? {}),
+					...(typeof isForceHttpsEnabled === 'boolean'
+						? { is_force_https_enabled: isForceHttpsEnabled }
+						: {})
+				}
+			};
+			return Response.json({ uuid: 'app-2' });
+		}
 		if (url.pathname in responses) return Response.json(responses[url.pathname]);
 		return Response.json({ message: 'Resource not found.' }, { status: 404 });
 	}

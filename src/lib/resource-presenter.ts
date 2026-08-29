@@ -24,6 +24,13 @@ export interface ProjectStats {
 	resources: number;
 }
 
+export interface ApplicationHierarchy {
+	projectUuid: string;
+	projectName: string;
+	environmentUuid: string;
+	environmentName: string;
+}
+
 export interface ProjectResource extends ResourceSummary {
 	group: 'applications' | 'services' | 'databases';
 }
@@ -230,6 +237,50 @@ export function projectEnvironments(value: unknown): ProjectEnvironment[] {
 			resources
 		};
 	});
+}
+
+export function applicationHierarchy(
+	applicationValue: unknown,
+	projectsValue: unknown
+): ApplicationHierarchy | undefined {
+	const application = asRecord(applicationValue);
+	if (!application) return undefined;
+	const applicationEnvironment = asRecord(application.environment);
+	const nestedProject = asRecord(applicationEnvironment?.project);
+	if (applicationEnvironment && nestedProject) {
+		const projectUuid = firstText(nestedProject, ['uuid', 'id']);
+		const environmentUuid = firstText(applicationEnvironment, ['uuid', 'id']);
+		if (projectUuid && environmentUuid) {
+			return {
+				projectUuid,
+				projectName: firstText(nestedProject, ['name']) || projectUuid,
+				environmentUuid,
+				environmentName: firstText(applicationEnvironment, ['name']) || environmentUuid
+			};
+		}
+	}
+
+	const environmentId = firstText(application, ['environment_id', 'environment_uuid']);
+	if (!environmentId) return undefined;
+	for (const project of normalizeRecords(projectsValue)) {
+		for (const environment of normalizeRecords(project.environments)) {
+			const candidateIds = [
+				firstText(environment, ['id']),
+				firstText(environment, ['uuid'])
+			].filter(Boolean);
+			if (!candidateIds.includes(environmentId)) continue;
+			const projectUuid = firstText(project, ['uuid', 'id']);
+			const environmentUuid = firstText(environment, ['uuid', 'id']);
+			if (!projectUuid || !environmentUuid) return undefined;
+			return {
+				projectUuid,
+				projectName: firstText(project, ['name']) || projectUuid,
+				environmentUuid,
+				environmentName: firstText(environment, ['name']) || environmentUuid
+			};
+		}
+	}
+	return undefined;
 }
 
 export function environmentResources(value: unknown): ProjectResource[] {

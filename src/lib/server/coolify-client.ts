@@ -1,4 +1,4 @@
-export type CoolifyMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+export type CoolifyMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface CoolifyRequestOptions {
 	body?: unknown;

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { environmentResources } from '$lib/resource-presenter';
 	import { detailPath } from '$lib/resource-routes';
@@ -21,23 +20,14 @@
 	function resourceHref(group: string, id: string) {
 		return resolve(detailPath(group, id) ?? '/');
 	}
-
-	function openResource(group: string, id: string) {
-		void goto(resourceHref(group, id));
-	}
-
-	function handleResourceKeydown(event: KeyboardEvent, group: string, id: string) {
-		if (event.key !== 'Enter' && event.key !== ' ') return;
-		event.preventDefault();
-		openResource(group, id);
-	}
 </script>
 
 <header class="page-header">
 	<div>
 		<h1>{data.environmentName}</h1>
 		<p class="muted">
-			{resources.length} {resources.length === 1 ? 'resource' : 'resources'} in {data.projectName}
+			{resources.length}
+			{resources.length === 1 ? 'resource' : 'resources'} in {data.projectName}
 		</p>
 	</div>
 	<a
@@ -62,15 +52,7 @@
 			</thead>
 			<tbody>
 				{#each resources as resource (`${resource.group}:${resource.id}`)}
-					<tr
-						role="link"
-						tabindex="0"
-						onclick={(event) => {
-							if ((event.target as HTMLElement).closest('a')) return;
-							openResource(resource.group, resource.id);
-						}}
-						onkeydown={(event) => handleResourceKeydown(event, resource.group, resource.id)}
-					>
+					<tr>
 						<td>
 							<a href={resourceHref(resource.group, resource.id)}>{resource.name}</a>
 						</td>

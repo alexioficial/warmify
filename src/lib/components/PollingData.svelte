@@ -7,12 +7,8 @@
 		url,
 		interval = 5000
 	}: { initial: unknown; url: string; interval?: number } = $props();
-	let data = $state<unknown>();
+	let data = $derived(initial);
 	let error = $state('');
-
-	$effect.pre(() => {
-		if (data === undefined) data = initial;
-	});
 
 	onMount(() => {
 		const refresh = async () => {

@@ -6,17 +6,19 @@
 	import LogViewer from '$lib/components/LogViewer.svelte';
 	import RevealSecret from '$lib/components/RevealSecret.svelte';
 	import { onMount } from 'svelte';
-	import {
-		additionalData,
-		asRecord,
-		firstText,
-		resourceSummary
-	} from '$lib/resource-presenter';
+	import { additionalData, asRecord, firstText, resourceSummary } from '$lib/resource-presenter';
 
 	interface ConfigurationField {
 		name: string;
 		label: string;
-		type?: 'text' | 'url' | 'number' | 'textarea';
+		type?: 'text' | 'url' | 'number' | 'textarea' | 'checkbox' | 'password' | 'select';
+		section?: string;
+		coerce?: 'boolean' | 'integer' | 'base64' | 'json';
+		nullable?: boolean;
+		sensitive?: boolean;
+		min?: number;
+		max?: number;
+		options?: ReadonlyArray<{ value: string; label: string }>;
 	}
 
 	interface ResourceDetailData {
@@ -197,16 +199,44 @@
 		{#if settingsNavGroups.has(data.group)}
 			<nav class="resource-nav" aria-label="Resource settings">
 				<p class="nav-heading">- Settings -</p>
-				<a href="#overview" aria-current={activeSection === 'overview' ? 'location' : undefined} onclick={() => selectSection('overview')}>General</a>
+				<a
+					href="#overview"
+					aria-current={activeSection === 'overview' ? 'location' : undefined}
+					onclick={() => selectSection('overview')}>General</a
+				>
 				{#each configurationGroups as group (group.id)}
-					<a href={`#${group.id}`} aria-current={activeSection === group.id ? 'location' : undefined} onclick={() => selectSection(group.id)}>{group.title}</a>
+					<a
+						href={`#${group.id}`}
+						aria-current={activeSection === group.id ? 'location' : undefined}
+						onclick={() => selectSection(group.id)}>{group.title}</a
+					>
 				{/each}
-				{#if variableGroups.has(data.group)}<a href="#variables" aria-current={activeSection === 'variables' ? 'location' : undefined} onclick={() => selectSection('variables')}>Environment variables</a>{/if}
-				{#if related.storages}<a href="#storage" aria-current={activeSection === 'storage' ? 'location' : undefined} onclick={() => selectSection('storage')}>Persistent storage</a>{/if}
-				{#if related.tasks}<a href="#tasks" aria-current={activeSection === 'tasks' ? 'location' : undefined} onclick={() => selectSection('tasks')}>Scheduled tasks</a>{/if}
+				{#if variableGroups.has(data.group)}<a
+						href="#variables"
+						aria-current={activeSection === 'variables' ? 'location' : undefined}
+						onclick={() => selectSection('variables')}>Environment variables</a
+					>{/if}
+				{#if related.storages}<a
+						href="#storage"
+						aria-current={activeSection === 'storage' ? 'location' : undefined}
+						onclick={() => selectSection('storage')}>Persistent storage</a
+					>{/if}
+				{#if related.tasks}<a
+						href="#tasks"
+						aria-current={activeSection === 'tasks' ? 'location' : undefined}
+						onclick={() => selectSection('tasks')}>Scheduled tasks</a
+					>{/if}
 				<p class="nav-heading">- Observe & troubleshoot -</p>
-				{#if related.deployments}<a href="#deployments" aria-current={activeSection === 'deployments' ? 'location' : undefined} onclick={() => selectSection('deployments')}>Deployments</a>{/if}
-				{#if related.logs !== undefined || record.logs}<a href="#logs" aria-current={activeSection === 'logs' ? 'location' : undefined} onclick={() => selectSection('logs')}>Runtime logs</a>{/if}
+				{#if related.deployments}<a
+						href="#deployments"
+						aria-current={activeSection === 'deployments' ? 'location' : undefined}
+						onclick={() => selectSection('deployments')}>Deployments</a
+					>{/if}
+				{#if related.logs !== undefined || record.logs}<a
+						href="#logs"
+						aria-current={activeSection === 'logs' ? 'location' : undefined}
+						onclick={() => selectSection('logs')}>Runtime logs</a
+					>{/if}
 			</nav>
 		{/if}
 

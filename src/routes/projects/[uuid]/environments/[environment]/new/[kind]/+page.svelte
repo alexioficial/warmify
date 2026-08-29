@@ -3,9 +3,7 @@
 	import { asRecord, firstText, normalizeRecords, resourceSummary } from '$lib/resource-presenter';
 
 	let { data, form } = $props();
-	const values = $derived(
-		(asRecord(asRecord(form)?.values) ?? {}) as Record<string, string>
-	);
+	const values = $derived((asRecord(asRecord(form)?.values) ?? {}) as Record<string, string>);
 	const servers = $derived(normalizeRecords(data.servers));
 	const destinations = $derived(normalizeRecords(data.destinations));
 	const privateKeys = $derived(normalizeRecords(data.privateKeys));
@@ -25,7 +23,7 @@
 		'private-deploy-key': 'Private Git Repository (with Deploy Key)',
 		'github-app': 'Git Repository (with GitHub App)',
 		'gitlab-app': 'Git Repository (with GitLab App)',
-		'dockerfile': 'Dockerfile',
+		dockerfile: 'Dockerfile',
 		'docker-compose': 'Docker Compose',
 		'docker-image': 'Docker Image',
 		...databaseNames
@@ -132,22 +130,34 @@
 					Repository URL
 					<input
 						name="git_repository"
-						placeholder={data.kind === 'private-deploy-key' ? 'git@github.com:owner/repository.git' : 'https://github.com/owner/repository'}
+						placeholder={data.kind === 'private-deploy-key'
+							? 'git@github.com:owner/repository.git'
+							: 'https://github.com/owner/repository'}
 						value={values.git_repository ?? ''}
 						required
 					/>
 				</label>
 				<div class="field-grid">
-					<label>Branch <input name="git_branch" value={values.git_branch || 'main'} required /></label>
+					<label
+						>Branch <input name="git_branch" value={values.git_branch || 'main'} required /></label
+					>
 					<label>
 						Build pack
 						<select name="build_pack">
-							{#each ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'] as buildPack}
-								<option value={buildPack} selected={(values.build_pack || 'nixpacks') === buildPack}>{buildPack}</option>
+							{#each ['nixpacks', 'railpack', 'static', 'dockerfile', 'dockercompose'] as buildPack (buildPack)}
+								<option value={buildPack} selected={(values.build_pack || 'nixpacks') === buildPack}
+									>{buildPack}</option
+								>
 							{/each}
 						</select>
 					</label>
-					<label>Exposed ports <input name="ports_exposes" value={values.ports_exposes ?? ''} required /></label>
+					<label
+						>Exposed ports <input
+							name="ports_exposes"
+							value={values.ports_exposes ?? ''}
+							required
+						/></label
+					>
 					<label>Domains <input name="domains" value={values.domains ?? ''} /></label>
 				</div>
 			</fieldset>
@@ -156,7 +166,8 @@
 				<legend>Dockerfile</legend>
 				<label>
 					Dockerfile content
-					<textarea class="source-editor" name="dockerfile" placeholder="FROM ..." required></textarea>
+					<textarea class="source-editor" name="dockerfile" placeholder="FROM ..." required
+					></textarea>
 				</label>
 			</fieldset>
 		{:else if data.kind === 'docker-compose'}
@@ -164,7 +175,8 @@
 				<legend>Docker Compose</legend>
 				<label>
 					Docker Compose file
-					<textarea class="source-editor" name="docker_compose" placeholder="services:" required></textarea>
+					<textarea class="source-editor" name="docker_compose" placeholder="services:" required
+					></textarea>
 				</label>
 			</fieldset>
 		{:else if data.kind === 'docker-image'}
@@ -172,11 +184,23 @@
 				<legend>Docker image</legend>
 				<label>
 					Image name
-					<input name="docker_registry_image_name" placeholder="nginx" value={values.docker_registry_image_name ?? ''} required />
+					<input
+						name="docker_registry_image_name"
+						placeholder="nginx"
+						value={values.docker_registry_image_name ?? ''}
+						required
+					/>
 				</label>
 				<div class="field-grid">
-					<label>Tag <input name="docker_registry_image_tag" value={values.docker_registry_image_tag || 'latest'} /></label>
-					<label>Exposed ports <input name="ports_exposes" value={values.ports_exposes ?? ''} /></label>
+					<label
+						>Tag <input
+							name="docker_registry_image_tag"
+							value={values.docker_registry_image_tag || 'latest'}
+						/></label
+					>
+					<label
+						>Exposed ports <input name="ports_exposes" value={values.ports_exposes ?? ''} /></label
+					>
 					<label class="wide">Domains <input name="domains" value={values.domains ?? ''} /></label>
 				</div>
 			</fieldset>
@@ -185,7 +209,13 @@
 				<legend>{databaseNames[data.kind]}</legend>
 				<div class="field-grid">
 					<label>Docker image override <input name="image" value={values.image ?? ''} /></label>
-					<label>Public port <input name="public_port" type="number" value={values.public_port ?? ''} /></label>
+					<label
+						>Public port <input
+							name="public_port"
+							type="number"
+							value={values.public_port ?? ''}
+						/></label
+					>
 				</div>
 				<label><input type="checkbox" name="is_public" /> Publicly accessible</label>
 			</fieldset>
@@ -195,7 +225,8 @@
 			<legend>General</legend>
 			<div class="field-grid">
 				<label>Name <input name="name" value={values.name ?? ''} /></label>
-				<label>Description <textarea name="description">{values.description ?? ''}</textarea></label>
+				<label>Description <textarea name="description">{values.description ?? ''}</textarea></label
+				>
 			</div>
 		</fieldset>
 

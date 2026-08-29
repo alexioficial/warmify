@@ -55,6 +55,7 @@ DELETE /applications/{uuid}/scheduled-tasks/{task_uuid}
 PATCH /applications/{uuid}/scheduled-tasks/{task_uuid}
 GET /applications/{uuid}/scheduled-tasks/{task_uuid}/executions
 POST /applications/{uuid}/scheduled-tasks/{task_uuid}/execute
+PUT /applications/{uuid}/storages/{storage_uuid}/backups
 DELETE /applications/{uuid}/storages/{storage_uuid}/backups
 POST /applications/{uuid}/storages/{storage_uuid}/backups/run`
 	],
@@ -124,6 +125,7 @@ GET /databases/{uuid}/storages
 POST /databases/{uuid}/storages
 PATCH /databases/{uuid}/storages
 DELETE /databases/{uuid}/storages/{storage_uuid}
+PUT /databases/{uuid}/storages/{storage_uuid}/backups
 GET /databases/{uuid}/tags
 POST /databases/{uuid}/tags
 DELETE /databases/{uuid}/tags/{tag_uuid}
@@ -314,6 +316,7 @@ DELETE /services/{uuid}/scheduled-tasks/{task_uuid}
 PATCH /services/{uuid}/scheduled-tasks/{task_uuid}
 GET /services/{uuid}/scheduled-tasks/{task_uuid}/executions
 POST /services/{uuid}/scheduled-tasks/{task_uuid}/execute
+PUT /services/{uuid}/storages/{storage_uuid}/backups
 DELETE /services/{uuid}/storages/{storage_uuid}/backups
 POST /services/{uuid}/storages/{storage_uuid}/backups/run`
 	],

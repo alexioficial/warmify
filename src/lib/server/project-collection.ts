@@ -1,7 +1,9 @@
-import { firstText, normalizeRecords } from '$lib/resource-presenter';
-import type { CoolifyClient } from '$lib/server/coolify-client';
+import { firstText, normalizeRecords } from '../resource-presenter';
+import type { CoolifyClient } from './coolify-client';
 
-export async function loadProjectCollection(client: CoolifyClient): Promise<Record<string, unknown>[]> {
+export async function loadProjectCollection(
+	client: CoolifyClient
+): Promise<Record<string, unknown>[]> {
 	const projects = normalizeRecords(await client.request('GET', '/projects'));
 	const [resourceResult, environmentResults] = await Promise.all([
 		client.request('GET', '/resources').catch(() => []),
@@ -36,6 +38,7 @@ export async function loadProjectCollection(client: CoolifyClient): Promise<Reco
 
 		return {
 			...project,
+			environments,
 			environments_count: environments.length,
 			resources_count: resources
 		};

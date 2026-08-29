@@ -5,7 +5,13 @@ import type { CoolifyMethod, CoolifyRequestOptions } from '$lib/server/coolify-c
 import { CoolifyError } from '$lib/server/coolify-client';
 import { invalidateCollection } from '$lib/server/inventory-cache';
 import { redactSecrets } from '$lib/server/redact';
-import { configurationBody, resourceActionRequest } from '$lib/server/resource-actions';
+import {
+	applicationDomainFailure,
+	applicationDomainSubmission,
+	configurationFailure,
+	configurationSubmission,
+	resourceActionRequest
+} from '$lib/server/resource-actions';
 import { resourceGroups } from '$lib/server/resource-groups';
 import { audit, getCoolifyClient } from '$lib/server/runtime';
 
@@ -182,21 +188,97 @@ export function createResourceActions(groupName: string) {
 			const uuid = eventUuid(event);
 			const group = getGroup(groupName);
 			const form = await request.formData();
-			const body = configurationBody(
-				form,
-				(group.configurationFields ?? []).map((field) => field.name)
-			);
-			if (Object.keys(body).length === 0) return fail(400, { error: 'No editable fields found' });
+			const section = String(form.get('_section') ?? 'configuration');
+			const fields =
+				groupName === 'applications'
+					? (group.configurationFields ?? []).filter((field) => field.section === section)
+					: (group.configurationFields ?? []);
+			if (fields.length === 0)
+				return fail(400, { error: 'Unknown configuration section', section, values: {} });
+			const submission = configurationSubmission(form, fields);
+			if (Object.keys(submission.fieldErrors).length > 0) {
+				return fail(400, {
+					error: 'Correct the highlighted fields.',
+					fieldErrors: submission.fieldErrors,
+					values: submission.values,
+					section
+				});
+			}
+			if (Object.keys(submission.body).length === 0)
+				return fail(400, {
+					error: 'No editable fields found',
+					values: submission.values,
+					section
+				});
 			const result = await mutate(
-				{ method: 'PATCH', path: detailPath(groupName, uuid), options: { body } },
+				{
+					method: 'PATCH',
+					path: detailPath(groupName, uuid),
+					options: { body: submission.body }
+				},
 				`update-${groupName}`,
 				locals.user?.username
 			);
-			if (!result.success)
-				return fail(failureStatus(result.caught), { error: failureMessage(result.caught) });
+			if (!result.success) {
+				const failure = configurationFailure(result.caught, fields, submission.sensitiveValues);
+				return fail(failureStatus(result.caught), {
+					...failure,
+					values: submission.values,
+					section
+				});
+			}
 			invalidateCollection(groupName);
 			invalidateCollection('resources');
-			return { message: 'Configuration saved' };
+			return {
+				message: 'Configuration saved',
+				values: submission.values,
+				section
+			};
+		},
+
+		saveDomains: async (event: RequestEvent) => {
+			const { request, locals } = event;
+			const uuid = eventUuid(event);
+			if (groupName !== 'applications') return fail(404, { error: 'Action is not available' });
+			const submission = applicationDomainSubmission(await request.formData());
+			if (!submission.body) {
+				return fail(400, {
+					error: 'Correct the highlighted domains.',
+					domainRows: submission.rows,
+					redirect: submission.redirect,
+					forceHttps: submission.forceHttps,
+					rowErrors: submission.rowErrors,
+					section: 'domains'
+				});
+			}
+			const result = await mutate(
+				{
+					method: 'PATCH',
+					path: detailPath(groupName, uuid),
+					options: { body: submission.body }
+				},
+				'update-application-domains',
+				locals.user?.username
+			);
+			if (!result.success) {
+				return fail(failureStatus(result.caught), {
+					...applicationDomainFailure(result.caught),
+					domainRows: submission.rows,
+					redirect: submission.redirect,
+					forceHttps: submission.forceHttps,
+					rowErrors: submission.rowErrors,
+					section: 'domains'
+				});
+			}
+			invalidateCollection('applications');
+			invalidateCollection('resources');
+			return {
+				message: 'Domains saved',
+				domainRows: submission.rows,
+				redirect: submission.redirect,
+				forceHttps: submission.forceHttps,
+				section: 'domains'
+			};
 		},
 
 		createEnvironment: async (event: RequestEvent) => {

@@ -4,6 +4,7 @@
 	let { data } = $props();
 	const revealOperation = 'GET:/applications/{uuid}/envs';
 </script>
+
 <svelte:head><title>Environment variables - {data.applicationName} - Warmify</title></svelte:head>
 {#if data.requestError}<p class="error" role="alert">{data.requestError}</p>{/if}
 <section>

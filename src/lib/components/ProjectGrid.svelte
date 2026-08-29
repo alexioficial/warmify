@@ -3,10 +3,7 @@
 	import { normalizeRecords, projectStats, resourceSummary } from '$lib/resource-presenter';
 	import { detailPath } from '$lib/resource-routes';
 
-	let {
-		data,
-		searchable = false
-	}: { data: unknown; searchable?: boolean } = $props();
+	let { data, searchable = false }: { data: unknown; searchable?: boolean } = $props();
 	let query = $state('');
 	const projects = $derived(
 		normalizeRecords(data).map((record) => ({
