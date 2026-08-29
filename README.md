@@ -1,42 +1,69 @@
-# sv
+# Warmify
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Warmify is a small, server-rendered administrative wrapper for the public Coolify API. Coolify remains the source of truth; Warmify stores only disposable inventory snapshots in SQLite to accelerate page loads, never users or independently managed resources, and never sends the Coolify API token to the browser.
 
-## Creating a project
+## Configuration
 
-If you're seeing this, you've probably already done this step. Congrats!
+Copy `.env.example` to `.env` and set:
 
-```sh
-# create a new project
-npx sv create my-app
-```
+- `COOLIFY_BASE_URL`: the trusted Coolify instance URL, with or without `/api/v1`.
+- `COOLIFY_API_TOKEN`: a token able to perform the operations you expose. The intended single-admin deployment uses a root token.
+- `WARMIFY_ADMIN_USERNAME`: the Warmify login username.
+- `WARMIFY_ADMIN_PASSWORD`: the Warmify login password in plain text, as requested. Protect the `.env` file with operating-system permissions and do not commit it.
+- `WARMIFY_SESSION_TTL_HOURS`: session lifetime; defaults to 12 hours.
+- `WARMIFY_REQUEST_TIMEOUT_MS`: upstream request timeout; defaults to 15000 ms.
+- `WARMIFY_DATA_DIR`: directory that contains the SQLite cache; defaults to `.warmify-data` and should be `/data` in Coolify.
 
-To recreate this project with the same configuration:
+Warmify derives its cookie-signing key internally from `WARMIFY_ADMIN_PASSWORD`; changing the password invalidates existing sessions. Deploy behind HTTPS so production session cookies can use the `Secure` flag.
 
-```sh
-# recreate this project
-bun x sv@0.17.0 create --template minimal --types ts --add prettier eslint --install bun .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Development
 
 ```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
+bun install --frozen-lockfile
+bun run dev
 ```
 
-## Building
-
-To create a production version of your app:
+Quality checks:
 
 ```sh
-npm run build
+bun run check
+bun run lint
+bun run test
+bun run test:e2e
+bun run build
 ```
 
-You can preview the production build with `npm run preview`.
+Playwright uses a local Coolify simulation and never mutates a real instance. Install its browser once with `bun x playwright install chromium`.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## API coverage and safety
+
+`src/lib/server/endpoint-manifest.ts` is an allowlisted snapshot of the official Coolify OpenAPI document from 2026-08-25. It includes projects/environments, applications, services, databases/backups, deployments, servers, destinations, sources, storage, scheduled tasks, shared variables, teams, notifications, system operations and supported cloud providers.
+
+The normal interface follows Coolify's Project → Environment → Resource workflow. Projects expose their nested applications, services and databases; resource pages provide contextual lifecycle controls, configuration, environment variables, deployments, logs, storage, backups and scheduled tasks where the public API supports them. The new-resource flow supports public repositories, Docker images, services and every documented database engine.
+
+The complete API catalogue remains available as an unlinked advanced fallback for uncommon or newly introduced operations. It is not the primary management interface. There is no arbitrary upstream URL proxy.
+
+## Route structure
+
+Each resource family has its own physical SvelteKit route instead of passing through a generic `/manage/[group]` page. Collection and detail pages live under paths such as `/projects`, `/projects/[uuid]`, `/applications/[uuid]`, `/services/[uuid]`, `/databases/[uuid]`, `/deployments/[uuid]` and `/servers/[uuid]`. Infrastructure and administration follow the same pattern under `/destinations`, `/storage`, `/security/keys` and `/teams`.
+
+The route files are intentionally separate customization points, while common API, authentication, auditing and currently shared rendering logic stays in `src/lib/server` and `src/lib/components`. `/manage` is not retained as an alias. Only the unlinked advanced API catalogue uses the dynamic `/operations/[group]` route.
+
+- Upstream responses are recursively redacted before SSR and error rendering.
+- Sensitive GET responses require an explicit Reveal action and are loaded only then.
+- Stop, restart, cancel, move, migrate, rollback and similar actions require explicit confirmation.
+- Deletes require typing the first resource identifier exactly.
+- Mutations are never retried automatically.
+- Warmify emits metadata-only audit events to stdout and does not log request bodies or credentials.
+
+The public Coolify API is version-dependent. Warmify displays the connected version and reports unsupported endpoints without inventing internal Coolify functionality such as the browser terminal.
+
+## Production image
+
+The included multi-stage `dockerfile` builds the SvelteKit Node adapter output and runs it with Bun on port 3000. Supply the environment variables at runtime rather than baking `.env` into the image.
+
+### Persistent SQLite cache in Coolify
+
+Set `WARMIFY_DATA_DIR=/data`, then add Persistent Storage to the Warmify application with a volume mounted at `/data`. Mount the directory, not the individual database file. Warmify creates `/data/warmify.sqlite` and its WAL files automatically.
+
+Use a single Warmify replica while using SQLite. The database contains only redacted inventory snapshots and can be deleted and rebuilt from Coolify at any time. Dashboard, global search and every collection page render cached data first, start a Coolify synchronization, write the result back to SQLite and update the visible page when synchronization finishes. The first Dashboard visit also warms missing collection snapshots in the background so subsequent navigation is immediate. Variables, logs, secret reveal responses and other sensitive detail payloads are never persisted in the cache.
