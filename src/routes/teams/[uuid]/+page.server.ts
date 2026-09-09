@@ -1,6 +1,6 @@
-import { loadResourceDetail } from '$lib/server/resource-detail-page';
+import { loadTeamDetail } from '$lib/server/administration-pages';
 
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = ({ params, setHeaders }) =>
-	loadResourceDetail('teams', params.uuid, setHeaders);
+	loadTeamDetail(params.uuid, setHeaders);
