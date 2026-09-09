@@ -1,6 +1,9 @@
-import { loadResourceDetail } from '$lib/server/resource-detail-page';
+import { loadDeploymentPage, cancelDeployment } from '$lib/server/deployment-detail';
 
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ params, setHeaders }) =>
-	loadResourceDetail('deployments', params.uuid, setHeaders);
+export const load: PageServerLoad = ({ params, setHeaders }) => {
+	setHeaders({ 'cache-control': 'no-store' });
+	return loadDeploymentPage(params.uuid);
+};
+export const actions: Actions = { cancel: cancelDeployment };
