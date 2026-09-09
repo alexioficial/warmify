@@ -4,10 +4,19 @@ import { loadProjectCollection } from '$lib/server/project-collection';
 import { redactSecrets } from '$lib/server/redact';
 import { resourceGroups } from '$lib/server/resource-groups';
 import { getCoolifyClient } from '$lib/server/runtime';
+import { deploymentCollection } from '$lib/server/deployment-presenter';
 
 const PROJECTS_KEY = 'collection:projects';
 const DASHBOARD_KEY = 'dashboard';
 const RECENT_SYNC_MS = 5_000;
+export const CACHE_STALE_MS = 5 * 60_000;
+
+export interface CacheSnapshot<T> {
+	value: T;
+	updatedAt: number;
+	fromCache: boolean;
+	stale: boolean;
+}
 
 export interface DashboardSnapshot {
 	projects: ResourceRecord[];
@@ -62,17 +71,57 @@ export function synchronizeCollection(groupName: string, force = false): Promise
 	if (groupName === 'projects') return synchronizeProjects(force);
 	const group = resourceGroups[groupName];
 	if (!group) return Promise.reject(new Error('Resource group is not cacheable'));
-	return synchronizeCached(collectionKey(groupName), force, async () =>
-		redactSecrets(await getCoolifyClient().request('GET', group.listPath))
-	);
+	return synchronizeCached(collectionKey(groupName), force, async () => {
+		if (groupName === 'sources') {
+			const [github, gitlab] = await Promise.all([
+				getCoolifyClient().request('GET', '/github-apps'),
+				getCoolifyClient().request('GET', '/gitlab-apps')
+			]);
+			return [
+				...normalizeRecords(redactSecrets(github)).map((source) => ({
+					...source,
+					provider: 'github'
+				})),
+				...normalizeRecords(redactSecrets(gitlab)).map((source) => ({
+					...source,
+					provider: 'gitlab'
+				}))
+			];
+		}
+		const value = await getCoolifyClient().request('GET', group.listPath);
+		return groupName === 'deployments' ? deploymentCollection(value) : redactSecrets(value);
+	});
+}
+
+function snapshot<T>(value: T, updatedAt: number, fromCache: boolean): CacheSnapshot<T> {
+	return {
+		value,
+		updatedAt,
+		fromCache,
+		stale: Date.now() - updatedAt > CACHE_STALE_MS
+	};
+}
+
+export async function synchronizeCollectionSnapshot(
+	groupName: string,
+	force = true
+): Promise<CacheSnapshot<unknown>> {
+	const value = await synchronizeCollection(groupName, force);
+	const cached = readCache<unknown>(collectionKey(groupName));
+	return snapshot(value, cached?.updatedAt ?? Date.now(), false);
+}
+
+export async function collectionSnapshotForPage(
+	groupName: string
+): Promise<CacheSnapshot<unknown>> {
+	const cached = readCache<unknown>(collectionKey(groupName));
+	if (!cached) return synchronizeCollectionSnapshot(groupName, true);
+	void synchronizeCollection(groupName, true).catch(() => undefined);
+	return snapshot(cached.value, cached.updatedAt, true);
 }
 
 export async function collectionForPage(groupName: string): Promise<unknown> {
-	const key = collectionKey(groupName);
-	const cached = readCache<unknown>(key);
-	if (!cached) return synchronizeCollection(groupName, true);
-	void synchronizeCollection(groupName, true).catch(() => undefined);
-	return cached.value;
+	return (await collectionSnapshotForPage(groupName)).value;
 }
 
 export function invalidateCollection(groupName: string): void {
@@ -111,14 +160,26 @@ export function synchronizeDashboard(force = false): Promise<DashboardSnapshot> 
 	});
 }
 
-export async function dashboardForPage(): Promise<DashboardSnapshot> {
+export async function synchronizeDashboardSnapshot(
+	force = true
+): Promise<CacheSnapshot<DashboardSnapshot>> {
+	const value = await synchronizeDashboard(force);
+	const cached = readCache<DashboardSnapshot>(DASHBOARD_KEY);
+	return snapshot(value, cached?.updatedAt ?? Date.now(), false);
+}
+
+export async function dashboardSnapshotForPage(): Promise<CacheSnapshot<DashboardSnapshot>> {
 	const cached = readCache<DashboardSnapshot>(DASHBOARD_KEY);
 	if (!cached) {
-		const dashboard = await synchronizeDashboard(true);
+		const current = await synchronizeDashboardSnapshot(true);
 		primeMissingCollections();
-		return dashboard;
+		return current;
 	}
 	void synchronizeDashboard(true).catch(() => undefined);
 	primeMissingCollections();
-	return cached.value;
+	return snapshot(cached.value, cached.updatedAt, true);
+}
+
+export async function dashboardForPage(): Promise<DashboardSnapshot> {
+	return (await dashboardSnapshotForPage()).value;
 }

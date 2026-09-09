@@ -13,8 +13,10 @@
 {#if data.endpoints.length === 0}<p class="error">Unknown API operation group.</p>{/if}
 {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 {#if form?.result !== undefined}
-	<h2>Operation result</h2>
-	<pre>{JSON.stringify(form.result, null, 2)}</pre>
+	<details>
+		<summary>Operation result</summary>
+		<pre>{JSON.stringify(form.result, null, 2)}</pre>
+	</details>
 	{#if form.reveal}<RevealSecret
 			operationId={form.reveal.operationId}
 			parameters={form.reveal.parameters}

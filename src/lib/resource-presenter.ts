@@ -1,3 +1,5 @@
+import { redactSecrets } from '$lib/redact';
+
 export type ResourceRecord = Record<string, unknown>;
 
 export interface ResourceSummary {
@@ -12,9 +14,15 @@ export interface ResourceSummary {
 export interface DeploymentSummary {
 	id: string;
 	name: string;
+	rawStatus: string;
 	status: string;
+	group: 'active' | 'queued' | 'completed';
+	source: string;
+	commit: string;
 	message: string;
 	createdAt: string;
+	finishedAt: string;
+	duration: string;
 	environment: string;
 	server: string;
 }
@@ -69,6 +77,13 @@ export interface EnvironmentVariableSummary {
 	key: string;
 	value: string;
 	scope: string;
+	comment: string;
+	isPreview: boolean;
+	isLiteral: boolean;
+	isMultiline: boolean;
+	isShownOnce: boolean;
+	isRuntime: boolean;
+	isBuildtime: boolean;
 }
 
 const GROUP_TYPES: Record<string, string> = {
@@ -165,16 +180,64 @@ export function resourceSummary(value: unknown, group: string): ResourceSummary 
 
 export function deploymentSummary(value: unknown): DeploymentSummary {
 	const record = asRecord(value);
+	const rawStatus = firstText(record, ['status']).toLowerCase();
+	const status =
+		{
+			finished: 'Success',
+			in_progress: 'In progress',
+			queued: 'Queued',
+			failed: 'Failed',
+			'cancelled-by-user': 'Cancelled'
+		}[rawStatus] ?? humanize(rawStatus);
+	const pullRequestId = Number(firstText(record, ['pull_request_id'])) || 0;
+	const source =
+		record?.is_webhook === true
+			? pullRequestId > 0
+				? `Webhook - PR #${pullRequestId}`
+				: 'Webhook'
+			: pullRequestId > 0
+				? `Pull request #${pullRequestId}`
+				: record?.rollback === true
+					? 'Rollback'
+					: record?.is_api === true
+						? 'API'
+						: 'Manual';
+	const createdAt = firstText(record, ['created_at', 'started_at', 'updated_at']);
+	const finishedAt = firstText(record, ['finished_at']);
 	return {
 		id: firstText(record, ['deployment_uuid', 'uuid', 'id']),
 		name: firstText(record, ['application_name', 'name', 'application_uuid']) || 'Deployment',
-		status: humanize(firstText(record, ['status'])),
+		rawStatus,
+		status,
+		group: rawStatus === 'queued' ? 'queued' : rawStatus === 'in_progress' ? 'active' : 'completed',
+		source,
+		commit: firstText(record, ['commit', 'git_commit_sha']),
 		message: firstText(record, ['commit_message', 'message', 'commit', 'git_commit_sha']),
-		createdAt: firstText(record, ['created_at', 'started_at', 'updated_at']),
+		createdAt,
+		finishedAt,
+		duration: deploymentDuration(createdAt, finishedAt, rawStatus),
 		environment:
 			nestedText(record, 'environment', ['name']) || firstText(record, ['environment_name']),
 		server: nestedText(record, 'server', ['name']) || firstText(record, ['server_name'])
 	};
+}
+
+export function deploymentDuration(
+	startedAt: unknown,
+	finishedAt: unknown,
+	status: string,
+	now = new Date()
+): string {
+	if (status === 'queued') return 'Waiting';
+	const started = new Date(String(startedAt ?? ''));
+	if (Number.isNaN(started.getTime())) return '-';
+	const finished = status === 'in_progress' ? now : new Date(String(finishedAt ?? ''));
+	if (Number.isNaN(finished.getTime())) return '-';
+	const seconds = Math.max(0, Math.floor((finished.getTime() - started.getTime()) / 1000));
+	const hours = Math.floor(seconds / 3600);
+	const minutes = Math.floor((seconds % 3600) / 60);
+	const remainder = seconds % 60;
+	return `${hours > 0 ? `${String(hours).padStart(2, '0')}h ` : ''}${String(minutes).padStart(2, '0')}m ${String(remainder).padStart(2, '0')}s`;
 }
 
 export function projectStats(value: unknown): ProjectStats {
@@ -198,16 +261,21 @@ export function projectStats(value: unknown): ProjectStats {
 
 export function environmentVariableSummary(value: unknown): EnvironmentVariableSummary {
 	const record = asRecord(value);
-	const scopes = [
-		record?.is_build_time === true ? 'Build time' : '',
-		record?.is_preview === true ? 'Preview' : '',
-		record?.is_runtime === true ? 'Runtime' : ''
-	].filter(Boolean);
+	const isPreview = record?.is_preview === true;
+	const isRuntime = record?.is_runtime !== false;
+	const isBuildtime = record?.is_buildtime !== false && record?.is_build_time !== false;
 	return {
 		id: firstText(record, ['uuid', 'id', 'key']),
 		key: firstText(record, ['key']) || 'Unnamed variable',
 		value: firstText(record, ['value']) || '-',
-		scope: scopes.join(' - ') || 'Runtime'
+		scope: isPreview ? 'Preview' : 'Production',
+		comment: firstText(record, ['comment']),
+		isPreview,
+		isLiteral: record?.is_literal === true,
+		isMultiline: record?.is_multiline === true,
+		isShownOnce: record?.is_shown_once === true,
+		isRuntime,
+		isBuildtime
 	};
 }
 
@@ -306,7 +374,9 @@ export function additionalData(value: unknown, knownKeys: readonly string[]): Re
 	const record = asRecord(value);
 	if (!record) return {};
 	const known = new Set(knownKeys);
-	return Object.fromEntries(Object.entries(record).filter(([key]) => !known.has(key)));
+	return redactSecrets(
+		Object.fromEntries(Object.entries(record).filter(([key]) => !known.has(key)))
+	) as ResourceRecord;
 }
 
 export function formatTimestamp(value: unknown): string {

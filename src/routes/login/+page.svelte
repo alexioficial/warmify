@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	let { data, form } = $props();
+	// Binding adopts text entered into the SSR input before hydration instead of clearing it.
+	let username = $state(untrack(() => form?.username ?? ''));
 </script>
 
 <svelte:head><title>Sign in - Warmify</title></svelte:head>
@@ -13,7 +16,7 @@
 		>Username <input
 			name="username"
 			autocomplete="username"
-			value={form?.username ?? ''}
+			bind:value={username}
 			required
 		/></label
 	>
