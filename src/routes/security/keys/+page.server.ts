@@ -1,5 +1,5 @@
-import { loadResourceIndex } from '$lib/server/resource-index-page';
+import { loadPrivateKeyIndex } from '$lib/server/administration-pages';
 
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ setHeaders }) => loadResourceIndex('security', setHeaders);
+export const load: PageServerLoad = ({ setHeaders }) => loadPrivateKeyIndex(setHeaders);

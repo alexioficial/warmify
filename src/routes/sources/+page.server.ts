@@ -1,5 +1,5 @@
-import { loadResourceIndex } from '$lib/server/resource-index-page';
+import { loadSourcesIndex } from '$lib/server/source-pages';
 
 import type { PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ setHeaders }) => loadResourceIndex('sources', setHeaders);
+export const load: PageServerLoad = ({ setHeaders }) => loadSourcesIndex(setHeaders);

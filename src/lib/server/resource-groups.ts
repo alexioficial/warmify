@@ -43,6 +43,9 @@ export const resourceGroups: Record<string, ResourceGroupConfig> = {
 				type: 'textarea',
 				section: 'application-details'
 			},
+			{ name: 'git_repository', label: 'Repository', section: 'git-source' },
+			{ name: 'git_branch', label: 'Branch', section: 'git-source' },
+			{ name: 'git_commit_sha', label: 'Commit SHA', section: 'git-source' },
 			{
 				name: 'build_pack',
 				label: 'Build pack',
@@ -225,6 +228,67 @@ export const resourceGroups: Record<string, ResourceGroupConfig> = {
 				section: 'container-labels',
 				coerce: 'boolean'
 			},
+			{ name: 'limits_memory', label: 'Memory limit', section: 'resource-limits' },
+			{ name: 'limits_memory_swap', label: 'Memory swap limit', section: 'resource-limits' },
+			{
+				name: 'limits_memory_swappiness',
+				label: 'Memory swappiness',
+				type: 'number',
+				section: 'resource-limits',
+				coerce: 'integer',
+				nullable: true,
+				min: 0,
+				max: 100
+			},
+			{
+				name: 'limits_memory_reservation',
+				label: 'Memory reservation',
+				section: 'resource-limits'
+			},
+			{ name: 'limits_cpus', label: 'CPU limit', section: 'resource-limits' },
+			{
+				name: 'limits_cpuset',
+				label: 'CPU set',
+				section: 'resource-limits',
+				nullable: true
+			},
+			{
+				name: 'limits_cpu_shares',
+				label: 'CPU shares',
+				type: 'number',
+				section: 'resource-limits',
+				coerce: 'integer',
+				nullable: true,
+				min: 0
+			},
+			{
+				name: 'manual_webhook_secret_github',
+				label: 'GitHub webhook secret',
+				type: 'password',
+				section: 'webhooks',
+				sensitive: true
+			},
+			{
+				name: 'manual_webhook_secret_gitlab',
+				label: 'GitLab webhook secret',
+				type: 'password',
+				section: 'webhooks',
+				sensitive: true
+			},
+			{
+				name: 'manual_webhook_secret_bitbucket',
+				label: 'Bitbucket webhook secret',
+				type: 'password',
+				section: 'webhooks',
+				sensitive: true
+			},
+			{
+				name: 'manual_webhook_secret_gitea',
+				label: 'Gitea webhook secret',
+				type: 'password',
+				section: 'webhooks',
+				sensitive: true
+			},
 			{ name: 'health_check_path', label: 'Health check path', section: 'healthcheck' }
 		]
 	},
@@ -233,9 +297,37 @@ export const resourceGroups: Record<string, ResourceGroupConfig> = {
 		listPath: '/services',
 		detailPath: '/services/{uuid}',
 		configurationFields: [
-			{ name: 'name', label: 'Name' },
-			{ name: 'description', label: 'Description', type: 'textarea' },
-			{ name: 'docker_compose', label: 'Docker Compose', type: 'textarea' }
+			{ name: 'name', label: 'Name', section: 'general' },
+			{ name: 'description', label: 'Description', type: 'textarea', section: 'general' },
+			{
+				name: 'instant_deploy',
+				label: 'Deploy immediately after configuration changes',
+				type: 'checkbox',
+				section: 'general',
+				coerce: 'boolean'
+			},
+			{
+				name: 'connect_to_docker_network',
+				label: 'Connect to the predefined Docker network',
+				type: 'checkbox',
+				section: 'general',
+				coerce: 'boolean'
+			},
+			{
+				name: 'is_container_label_escape_enabled',
+				label: 'Escape special characters in container labels',
+				type: 'checkbox',
+				section: 'general',
+				coerce: 'boolean'
+			},
+			{
+				name: 'docker_compose_raw',
+				label: 'Docker Compose',
+				type: 'textarea',
+				section: 'compose',
+				coerce: 'base64',
+				sensitive: true
+			}
 		]
 	},
 	databases: {
@@ -284,6 +376,8 @@ export const resourceGroups: Record<string, ResourceGroupConfig> = {
 			{ name: 'region', label: 'Region' }
 		]
 	},
+	'cloud-tokens': { title: 'Cloud tokens', listPath: '/cloud-tokens' },
+	'cloud-init-scripts': { title: 'Cloud-init scripts', listPath: '/cloud-init-scripts' },
 	security: {
 		title: 'Private keys',
 		listPath: '/security/keys',

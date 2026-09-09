@@ -1,8 +1,12 @@
 <script lang="ts">
-	import ApplicationRoutePlaceholder from '$lib/components/ApplicationRoutePlaceholder.svelte';
+	import ApplicationConfigurationSection from '$lib/components/ApplicationConfigurationSection.svelte';
+	let { data, form } = $props();
 </script>
 
-<ApplicationRoutePlaceholder
+<ApplicationConfigurationSection
+	application={data.application}
+	configurationFields={data.configurationFields}
 	title="Resource limits"
-	description="Configure CPU and memory limits."
+	section="resource-limits"
+	{form}
 />

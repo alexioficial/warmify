@@ -1,8 +1,16 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 
 import { asRecord, firstText } from '$lib/resource-presenter';
+import {
+	applicationEnvironmentBulkSubmission,
+	applicationEnvironmentVariableFailure,
+	applicationEnvironmentVariableSubmission,
+	findEnvironmentVariable,
+	redactApplicationEnvironmentVariables
+} from '$lib/server/application-environment-variables';
 import type { CoolifyMethod, CoolifyRequestOptions } from '$lib/server/coolify-client';
 import { CoolifyError } from '$lib/server/coolify-client';
+import { requestCapability } from '$lib/server/capabilities';
 import { invalidateCollection } from '$lib/server/inventory-cache';
 import { redactSecrets } from '$lib/server/redact';
 import {
@@ -14,6 +22,7 @@ import {
 } from '$lib/server/resource-actions';
 import { resourceGroups } from '$lib/server/resource-groups';
 import { audit, getCoolifyClient } from '$lib/server/runtime';
+import { serviceVariableBody } from './service-operation-presenter';
 
 import { collectionPath } from '$lib/resource-routes';
 import type { RequestEvent } from '@sveltejs/kit';
@@ -67,11 +76,25 @@ function detailPath(groupName: string, uuid: string): string {
 	return getGroup(groupName).detailPath!.replace('{uuid}', encodeURIComponent(uuid));
 }
 
-async function optionalGet(path: string): Promise<unknown> {
+interface OptionalResult {
+	value: unknown;
+	status: 'available' | 'unavailable' | 'error';
+}
+
+async function optionalGet(capability: string, path: string): Promise<OptionalResult> {
 	try {
-		return redactSecrets(await getCoolifyClient().request('GET', path));
+		const result = await requestCapability(capability, () =>
+			getCoolifyClient().request('GET', path)
+		);
+		if (!result.available) return { value: undefined, status: 'unavailable' };
+		return {
+			value: path.endsWith('/envs')
+				? redactApplicationEnvironmentVariables(result.value)
+				: redactSecrets(result.value),
+			status: 'available'
+		};
 	} catch {
-		return undefined;
+		return { value: undefined, status: 'error' };
 	}
 }
 
@@ -123,11 +146,11 @@ export async function loadResourceDetail(
 		const data = redactSecrets(
 			await getCoolifyClient().request('GET', detailPath(groupName, uuid))
 		);
-		const relatedEntries = await Promise.all(
-			(RELATED_REQUESTS[groupName] ?? []).map(async (request) => [
-				request.key,
-				await optionalGet(request.path(encodedUuid))
-			])
+		const relatedResults = await Promise.all(
+			(RELATED_REQUESTS[groupName] ?? []).map(async (request) => ({
+				key: request.key,
+				result: await optionalGet(`${groupName}-${request.key}`, request.path(encodedUuid))
+			}))
 		);
 		return {
 			title: group.title,
@@ -135,7 +158,12 @@ export async function loadResourceDetail(
 			uuid,
 			configurationFields: group.configurationFields ?? [],
 			data,
-			related: Object.fromEntries(relatedEntries)
+			related: Object.fromEntries(relatedResults.map(({ key, result }) => [key, result.value])),
+			relatedCapabilities: Object.fromEntries(
+				relatedResults
+					.filter(({ result }) => result.status !== 'available')
+					.map(({ key, result }) => [key, result.status])
+			)
 		};
 	} catch (caught) {
 		return {
@@ -145,6 +173,7 @@ export async function loadResourceDetail(
 			configurationFields: group.configurationFields ?? [],
 			data: null,
 			related: {},
+			relatedCapabilities: {},
 			requestError: failureMessage(caught)
 		};
 	}
@@ -189,10 +218,9 @@ export function createResourceActions(groupName: string) {
 			const group = getGroup(groupName);
 			const form = await request.formData();
 			const section = String(form.get('_section') ?? 'configuration');
-			const fields =
-				groupName === 'applications'
-					? (group.configurationFields ?? []).filter((field) => field.section === section)
-					: (group.configurationFields ?? []);
+			const fields = ['applications', 'services'].includes(groupName)
+				? (group.configurationFields ?? []).filter((field) => field.section === section)
+				: (group.configurationFields ?? []);
 			if (fields.length === 0)
 				return fail(400, { error: 'Unknown configuration section', section, values: {} });
 			const submission = configurationSubmission(form, fields);
@@ -320,30 +348,247 @@ export function createResourceActions(groupName: string) {
 			]);
 			if (!allowedGroups.has(groupName)) return fail(404, { error: 'Action is not available' });
 			const form = await request.formData();
-			const key = String(form.get('key') ?? '').trim();
-			const value = String(form.get('value') ?? '');
-			if (!key) return fail(400, { error: 'Variable key is required' });
+			const submission = applicationEnvironmentVariableSubmission(form);
+			if (!submission.body) {
+				return fail(400, {
+					error: 'Correct the highlighted fields.',
+					fieldErrors: submission.fieldErrors,
+					values: submission.values,
+					target: 'create'
+				});
+			}
+			const body = ['services', 'databases'].includes(groupName)
+				? serviceVariableBody(submission.body)
+				: ['applications', 'databases'].includes(groupName)
+					? submission.body
+					: {
+							key: submission.body.key,
+							value: submission.body.value,
+							is_preview: submission.body.is_preview,
+							is_literal: submission.body.is_literal,
+							is_multiline: submission.body.is_multiline,
+							is_shown_once: submission.body.is_shown_once
+						};
 			const result = await mutate(
 				{
 					method: 'POST',
 					path: `/${groupName}/${encodeURIComponent(uuid)}/envs`,
-					options: {
-						body: {
-							key,
-							value,
-							is_build_time: form.has('is_build_time'),
-							is_preview: form.has('is_preview'),
-							is_literal: form.has('is_literal'),
-							is_multiline: form.has('is_multiline')
-						}
-					}
+					options: { body }
 				},
 				`create-${groupName}-variable`,
 				locals.user?.username
 			);
-			if (!result.success)
-				return fail(failureStatus(result.caught), { error: failureMessage(result.caught) });
-			return { message: `Variable ${key} created` };
+			if (!result.success) {
+				const failure = applicationEnvironmentVariableFailure(
+					result.caught,
+					submission.sensitiveValues
+				);
+				return fail(failureStatus(result.caught), {
+					...failure,
+					values: submission.values,
+					target: 'create'
+				});
+			}
+			invalidateCollection(groupName);
+			invalidateCollection('resources');
+			invalidateCollection('projects');
+			return { message: `Variable ${submission.body.key} created`, target: 'create' };
+		},
+
+		updateVariable: async (event: RequestEvent) => {
+			const { request, locals } = event;
+			const uuid = eventUuid(event);
+			if (!['applications', 'services', 'databases'].includes(groupName))
+				return fail(404, { error: 'Action is not available' });
+			const form = await request.formData();
+			const target = String(form.get('env_uuid') ?? '');
+			if (!target)
+				return fail(400, {
+					error: 'Variable identifier is required.',
+					target,
+					operation: 'update' as const
+				});
+			const submission = applicationEnvironmentVariableSubmission(form);
+			if (!submission.body) {
+				return fail(400, {
+					error: 'Correct the highlighted fields.',
+					fieldErrors: submission.fieldErrors,
+					values: submission.values,
+					target,
+					operation: 'update' as const
+				});
+			}
+			if (groupName === 'databases') {
+				try {
+					const variables = redactApplicationEnvironmentVariables(
+						await getCoolifyClient().request('GET', `/databases/${encodeURIComponent(uuid)}/envs`)
+					);
+					const variable = findEnvironmentVariable(variables, target);
+					if (!variable)
+						return fail(404, {
+							error: 'Variable not found in this database.',
+							target,
+							operation: 'update' as const
+						});
+					if (firstText(variable, ['key']) !== submission.body.key)
+						return fail(400, {
+							error: 'The variable key changed. Reload before editing it.',
+							target,
+							operation: 'update' as const
+						});
+				} catch (caught) {
+					return fail(failureStatus(caught), {
+						...applicationEnvironmentVariableFailure(caught, submission.sensitiveValues),
+						target,
+						operation: 'update' as const
+					});
+				}
+			}
+			const result = await mutate(
+				{
+					method: 'PATCH',
+					path: `/${groupName}/${encodeURIComponent(uuid)}/envs`,
+					options: {
+						body: ['services', 'databases'].includes(groupName)
+							? serviceVariableBody(submission.body)
+							: submission.body
+					}
+				},
+				`update-${groupName.slice(0, -1)}-variable`,
+				locals.user?.username
+			);
+			if (!result.success) {
+				const failure = applicationEnvironmentVariableFailure(
+					result.caught,
+					submission.sensitiveValues
+				);
+				return fail(failureStatus(result.caught), {
+					...failure,
+					values: submission.values,
+					target,
+					operation: 'update' as const
+				});
+			}
+			invalidateCollection(groupName);
+			invalidateCollection('resources');
+			invalidateCollection('projects');
+			return {
+				message: `Variable ${submission.body.key} updated`,
+				target,
+				operation: 'update' as const
+			};
+		},
+
+		deleteVariable: async (event: RequestEvent) => {
+			const { request, locals } = event;
+			const uuid = eventUuid(event);
+			if (!['applications', 'services', 'databases'].includes(groupName))
+				return fail(404, { error: 'Action is not available' });
+			const form = await request.formData();
+			const envUuid = String(form.get('env_uuid') ?? '');
+			const confirmation = String(form.get('confirmation') ?? '');
+			if (!envUuid)
+				return fail(400, {
+					error: 'Variable identifier is required.',
+					target: envUuid,
+					operation: 'delete' as const
+				});
+			try {
+				const variables = redactApplicationEnvironmentVariables(
+					await getCoolifyClient().request('GET', `/${groupName}/${encodeURIComponent(uuid)}/envs`)
+				);
+				const variable = findEnvironmentVariable(variables, envUuid);
+				if (!variable)
+					return fail(404, {
+						error: 'Variable not found.',
+						target: envUuid,
+						operation: 'delete' as const
+					});
+				const key = firstText(variable, ['key']);
+				if (confirmation !== key && confirmation !== envUuid) {
+					return fail(400, {
+						error: `Type ${key || envUuid} exactly to delete this variable.`,
+						target: envUuid,
+						operation: 'delete' as const
+					});
+				}
+				const result = await mutate(
+					{
+						method: 'DELETE',
+						path: `/${groupName}/${encodeURIComponent(uuid)}/envs/${encodeURIComponent(envUuid)}`
+					},
+					`delete-${groupName.slice(0, -1)}-variable`,
+					locals.user?.username
+				);
+				if (!result.success) {
+					return fail(failureStatus(result.caught), {
+						...applicationEnvironmentVariableFailure(result.caught, []),
+						target: envUuid,
+						operation: 'delete' as const
+					});
+				}
+				invalidateCollection(groupName);
+				invalidateCollection('resources');
+				invalidateCollection('projects');
+				return {
+					message: `Variable ${key || envUuid} deleted`,
+					target: envUuid,
+					operation: 'delete' as const
+				};
+			} catch (caught) {
+				return fail(failureStatus(caught), {
+					...applicationEnvironmentVariableFailure(caught, []),
+					target: envUuid,
+					operation: 'delete' as const
+				});
+			}
+		},
+
+		bulkVariables: async (event: RequestEvent) => {
+			const { request, locals } = event;
+			const uuid = eventUuid(event);
+			if (!['applications', 'services', 'databases'].includes(groupName))
+				return fail(404, { error: 'Action is not available' });
+			const form = await request.formData();
+			if (groupName === 'databases' && String(form.get('preview') ?? '').trim())
+				return fail(400, {
+					error: 'Database variables have no preview scope. Use the production input only.',
+					target: 'bulk'
+				});
+			const submission = applicationEnvironmentBulkSubmission(form);
+			if (!submission.body) {
+				return fail(400, {
+					error: 'Correct the bulk variable input.',
+					fieldErrors: submission.fieldErrors,
+					target: 'bulk'
+				});
+			}
+			const result = await mutate(
+				{
+					method: 'PATCH',
+					path: `/${groupName}/${encodeURIComponent(uuid)}/envs/bulk`,
+					options: {
+						body: ['services', 'databases'].includes(groupName)
+							? { data: submission.body.data.map(serviceVariableBody) }
+							: submission.body
+					}
+				},
+				`bulk-upsert-${groupName.slice(0, -1)}-variables`,
+				locals.user?.username
+			);
+			if (!result.success) {
+				return fail(failureStatus(result.caught), {
+					...applicationEnvironmentVariableFailure(result.caught, submission.sensitiveValues),
+					target: 'bulk'
+				});
+			}
+			invalidateCollection(groupName);
+			invalidateCollection('resources');
+			invalidateCollection('projects');
+			return {
+				message: `${submission.count} variable${submission.count === 1 ? '' : 's'} upserted`,
+				target: 'bulk'
+			};
 		},
 
 		deleteResource: async (event: RequestEvent) => {

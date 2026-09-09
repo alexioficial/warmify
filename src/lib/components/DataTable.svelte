@@ -53,11 +53,18 @@
 		<table>
 			<thead>
 				{#if group === 'servers'}
-					<tr><th>Server</th><th>Address</th><th>Status</th></tr>
+					<tr><th scope="col">Server</th><th scope="col">Address</th><th scope="col">Status</th></tr
+					>
 				{:else if group === 'sources'}
-					<tr><th>Source</th><th>Provider</th><th>Status</th></tr>
+					<tr
+						><th scope="col">Source</th><th scope="col">Provider</th><th scope="col">Status</th></tr
+					>
 				{:else}
-					<tr><th>Name</th><th>Type</th><th>Status</th><th>Context</th></tr>
+					<tr
+						><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Status</th><th
+							scope="col">Context</th
+						></tr
+					>
 				{/if}
 			</thead>
 			<tbody>

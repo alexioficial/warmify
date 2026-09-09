@@ -1,8 +1,12 @@
 <script lang="ts">
-	import ApplicationRoutePlaceholder from '$lib/components/ApplicationRoutePlaceholder.svelte';
+	import ApplicationConfigurationSection from '$lib/components/ApplicationConfigurationSection.svelte';
+	let { data, form } = $props();
 </script>
 
-<ApplicationRoutePlaceholder
-	title="Webhooks"
-	description="Manage the manual Git webhook fields exposed by Coolify's public API."
+<ApplicationConfigurationSection
+	application={data.application}
+	configurationFields={data.configurationFields}
+	title="Manual webhook secrets"
+	section="webhooks"
+	{form}
 />

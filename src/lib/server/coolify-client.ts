@@ -1,3 +1,5 @@
+import { redactSecrets } from '$lib/redact';
+
 export type CoolifyMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface CoolifyRequestOptions {
@@ -33,6 +35,50 @@ async function parseResponse(response: Response): Promise<unknown> {
 	} catch {
 		return text;
 	}
+}
+
+function collectSensitiveValues(original: unknown, redacted: unknown, values: Set<string>): void {
+	if (typeof original === 'string' && redacted === '[REDACTED]') {
+		if (original.length >= 3) values.add(original);
+		return;
+	}
+	if (Array.isArray(original) && Array.isArray(redacted)) {
+		original.forEach((value, index) => collectSensitiveValues(value, redacted[index], values));
+		return;
+	}
+	if (
+		original &&
+		redacted &&
+		typeof original === 'object' &&
+		typeof redacted === 'object' &&
+		!Array.isArray(original) &&
+		!Array.isArray(redacted)
+	) {
+		for (const [key, value] of Object.entries(original)) {
+			collectSensitiveValues(value, (redacted as Record<string, unknown>)[key], values);
+		}
+	}
+}
+
+function replaceSensitiveStrings(value: unknown, secrets: readonly string[]): unknown {
+	if (typeof value === 'string') {
+		return secrets.reduce((result, secret) => result.split(secret).join('[REDACTED]'), value);
+	}
+	if (Array.isArray(value)) return value.map((entry) => replaceSensitiveStrings(entry, secrets));
+	if (!value || typeof value !== 'object') return value;
+	return Object.fromEntries(
+		Object.entries(value).map(([key, nested]) => [key, replaceSensitiveStrings(nested, secrets)])
+	);
+}
+
+function safeErrorData(data: unknown, token: string, body: unknown): unknown {
+	const redactedBody = redactSecrets(body);
+	const values = new Set<string>(token.length >= 3 ? [token] : []);
+	collectSensitiveValues(body, redactedBody, values);
+	return replaceSensitiveStrings(
+		redactSecrets(data),
+		[...values].sort((a, b) => b.length - a.length)
+	);
 }
 
 export class CoolifyClient {
@@ -78,15 +124,19 @@ export class CoolifyClient {
 			});
 			const data = await parseResponse(response);
 			if (!response.ok) {
+				const safeData = safeErrorData(data, this.token, options.body);
 				const message =
-					typeof data === 'object' && data && 'message' in data && typeof data.message === 'string'
-						? data.message
+					typeof safeData === 'object' &&
+					safeData &&
+					'message' in safeData &&
+					typeof safeData.message === 'string'
+						? safeData.message
 						: `Coolify request failed with status ${response.status}`;
 				const retryAfter = Number(response.headers.get('Retry-After'));
 				throw new CoolifyError(
 					message,
 					response.status,
-					data,
+					safeData,
 					Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined
 				);
 			}
@@ -94,8 +144,12 @@ export class CoolifyClient {
 		} catch (error) {
 			if (error instanceof CoolifyError) throw error;
 			if (controller.signal.aborted) throw new CoolifyError('Coolify request timed out', 504);
-			throw new CoolifyError(
+			const safeMessage = replaceSensitiveStrings(
 				error instanceof Error ? error.message : 'Unable to reach Coolify',
+				[this.token]
+			);
+			throw new CoolifyError(
+				typeof safeMessage === 'string' ? safeMessage : 'Unable to reach Coolify',
 				502
 			);
 		} finally {

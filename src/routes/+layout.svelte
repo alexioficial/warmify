@@ -65,6 +65,7 @@
 
 {#if data.user}
 	<div class="shell">
+		<a class="skip-link" href="#main-content">Skip to content</a>
 		<aside class="sidebar">
 			<a class="site-title" href={resolve('/')}>Warmify</a>
 			<form class="sidebar-search" method="GET" action={resolve('/search')}>
@@ -86,6 +87,16 @@
 				<p class="nav-heading">- Manage -</p>
 				<a href={resolve('/teams')} aria-current={current('/teams')}>Team</a>
 				<a href={resolve('/security/keys')} aria-current={current('/security/keys')}>Keys</a>
+				<a href={resolve('/security/cloud-tokens')} aria-current={current('/security/cloud-tokens')}
+					>Cloud tokens</a
+				>
+				<a
+					href={resolve('/security/cloud-init-scripts')}
+					aria-current={current('/security/cloud-init-scripts')}>Cloud-init scripts</a
+				>
+				<a href={resolve('/notifications')} aria-current={current('/notifications')}
+					>Notifications</a
+				>
 				<a href={resolve('/system')} aria-current={current('/system')}>System</a>
 			</nav>
 			<form class="sidebar-account" method="POST" action="/logout">
@@ -95,7 +106,7 @@
 		</aside>
 		<div class="workspace">
 			<header class="topbar">
-				<div class="breadcrumbs" aria-label="Breadcrumb">
+				<nav class="breadcrumbs" aria-label="Breadcrumb">
 					<a href={resolve('/')}>Root Team</a>
 					{#each breadcrumbs as breadcrumb, index (index)}
 						<span aria-hidden="true">/</span><a
@@ -103,9 +114,9 @@
 							href={resolve(breadcrumb.href as '/')}>{breadcrumb.label}</a
 						>
 					{/each}
-				</div>
+				</nav>
 			</header>
-			<main>
+			<main id="main-content" tabindex="-1">
 				{#if loadingPage}
 					<PageSkeleton />
 				{:else}
@@ -115,5 +126,5 @@
 		</div>
 	</div>
 {:else}
-	<main class="public-main">{@render children()}</main>
+	<main id="main-content" class="public-main">{@render children()}</main>
 {/if}

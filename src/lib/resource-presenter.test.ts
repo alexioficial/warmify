@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
 	additionalData,
+	deploymentDuration,
 	deploymentSummary,
 	environmentVariableSummary,
 	formatRelativeTime,
@@ -38,11 +39,41 @@ describe('resource presenter', () => {
 		).toMatchObject({
 			id: 'deploy-1',
 			name: 'docs',
+			rawStatus: 'in_progress',
 			status: 'In progress',
+			group: 'active',
+			source: 'Manual',
 			message: 'Document API',
 			environment: 'production',
 			server: 'primary'
 		});
+	});
+
+	test('groups queued and completed deployments and formats their source and duration', () => {
+		expect(
+			deploymentSummary({
+				deployment_uuid: 'deploy-2',
+				status: 'queued',
+				is_webhook: true,
+				pull_request_id: 17
+			})
+		).toMatchObject({ status: 'Queued', group: 'queued', source: 'Webhook - PR #17' });
+		expect(
+			deploymentSummary({
+				deployment_uuid: 'deploy-3',
+				status: 'finished',
+				created_at: '2026-08-30T12:00:00Z',
+				finished_at: '2026-08-30T12:01:05Z'
+			})
+		).toMatchObject({ status: 'Success', group: 'completed', duration: '01m 05s' });
+		expect(
+			deploymentDuration(
+				'2026-08-30T12:00:00Z',
+				undefined,
+				'in_progress',
+				new Date('2026-08-30T13:02:03Z')
+			)
+		).toBe('01h 02m 03s');
 	});
 
 	test('counts nested project environments and resources for project summaries', () => {
@@ -113,9 +144,18 @@ describe('resource presenter', () => {
 
 	test('keeps only unknown response fields for the secondary details section', () => {
 		expect(
-			additionalData({ name: 'docs', status: 'running', custom: 1 }, ['name', 'status'])
+			additionalData(
+				{
+					name: 'docs',
+					status: 'running',
+					custom: 1,
+					nested: { api_token: 'do-not-render', useful: true }
+				},
+				['name', 'status']
+			)
 		).toEqual({
-			custom: 1
+			custom: 1,
+			nested: { api_token: '[REDACTED]', useful: true }
 		});
 	});
 
@@ -139,7 +179,14 @@ describe('resource presenter', () => {
 			id: 'env-1',
 			key: 'DATABASE_URL',
 			value: '[REDACTED]',
-			scope: 'Build time'
+			scope: 'Production',
+			comment: '',
+			isPreview: false,
+			isLiteral: false,
+			isMultiline: false,
+			isShownOnce: false,
+			isRuntime: true,
+			isBuildtime: true
 		});
 		expect(logText({ logs: 'line one\nline two' })).toBe('line one\nline two');
 		expect(logText([{ output: 'first' }, { message: 'second' }])).toBe('first\nsecond');

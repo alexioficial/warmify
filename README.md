@@ -58,12 +58,32 @@ The route files are intentionally separate customization points, while common AP
 
 The public Coolify API is version-dependent. Warmify displays the connected version and reports unsupported endpoints without inventing internal Coolify functionality such as the browser terminal.
 
+### Supported and intentionally omitted
+
+Warmify covers the public-API workflows for project and environment management; scoped shared variables; application, service and database configuration; Git/Docker/service/database creation; deployments and rollback; logs; persistent storage; scheduled tasks and backups; servers, destinations, sources and S3 storage; private keys, cloud credentials, teams, notifications and system API/MCP controls. Availability still depends on the connected Coolify version, token permissions and resource type.
+
+Warmify deliberately does not reproduce features that require Coolify's private Laravel/Livewire internals. This includes the interactive browser terminal, unsupported team-member mutations and any transfer, export or provider action absent from the public OpenAPI contract. Unsupported optional endpoints appear as unavailable. Warmify never falls back to undocumented URLs, never turns a read request into a mutation and never retries a mutation automatically.
+
 ## Production image
 
-The included multi-stage `dockerfile` builds the SvelteKit Node adapter output and runs it with Bun on port 3000. Supply the environment variables at runtime rather than baking `.env` into the image.
+The included multi-stage `Dockerfile` builds the SvelteKit Node adapter output with Bun and runs the production server as the unprivileged `node` user with Node 24 on port 3000. The runtime intentionally uses Node rather than Bun because the native SQLite driver can crash Bun's N-API runtime under production traffic. Supply the environment variables at runtime rather than baking `.env` into the image.
+
+In Coolify, keep `COOLIFY_API_TOKEN` and `WARMIFY_ADMIN_PASSWORD` available at runtime only. Disable **Available at Buildtime** for both values: Warmify does not need them while building, and build-time variables can be copied into generated Dockerfile output and deployment logs. If either value has appeared in a screenshot or build log, rotate it before the next deployment.
+
+Recommended Coolify application settings:
+
+- Build pack: Dockerfile, using the repository `Dockerfile`.
+- Exposed port: `3000`; health-check path: `/health`.
+- Runtime variables: all values from `.env.example`, with `WARMIFY_DATA_DIR=/data`.
+- Replicas: exactly `1` while the cache uses SQLite.
+- Persistent storage: a Docker volume with any stable name, no Source Path, and Destination Path `/data`.
+
+After changing credentials, storage or the runtime image, redeploy the application rather than only restarting the old container.
 
 ### Persistent SQLite cache in Coolify
 
-Set `WARMIFY_DATA_DIR=/data`, then add Persistent Storage to the Warmify application with a volume mounted at `/data`. Mount the directory, not the individual database file. Warmify creates `/data/warmify.sqlite` and its WAL files automatically.
+Set `WARMIFY_DATA_DIR=/data`, then add Persistent Storage to the Warmify application with a volume mounted at `/data`. In Coolify's **Add volume mount** dialog, enter a stable Name, leave Source Path empty and set Destination Path to `/data`. Mount the directory, not the individual database file. Warmify creates `/data/warmify.sqlite` and its WAL files automatically.
 
 Use a single Warmify replica while using SQLite. The database contains only redacted inventory snapshots and can be deleted and rebuilt from Coolify at any time. Dashboard, global search and every collection page render cached data first, start a Coolify synchronization, write the result back to SQLite and update the visible page when synchronization finishes. The first Dashboard visit also warms missing collection snapshots in the background so subsequent navigation is immediate. Variables, logs, secret reveal responses and other sensitive detail payloads are never persisted in the cache.
+
+The image declares `/data` as its cache directory and grants it to the runtime user. If the volume is lost or intentionally removed, Warmify starts with an empty cache and repopulates it from Coolify; Coolify resources are unaffected because SQLite is not the source of truth.

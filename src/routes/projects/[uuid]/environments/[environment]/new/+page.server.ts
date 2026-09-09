@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 
 import { asRecord, firstText } from '$lib/resource-presenter';
+import { CoolifyError } from '$lib/server/coolify-client';
 import { redactSecrets } from '$lib/server/redact';
 import { getCoolifyClient } from '$lib/server/runtime';
 
@@ -13,10 +14,20 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 	const [projectResult, environmentResult] = await Promise.all([
 		getCoolifyClient().request('GET', `/projects/${projectUuid}`),
 		getCoolifyClient().request('GET', `/projects/${projectUuid}/${environmentUuid}`)
-	]);
+	]).catch((caught: unknown) => {
+		if (caught instanceof CoolifyError && caught.status === 404)
+			error(404, 'Environment not found in this project');
+		throw caught;
+	});
 	const project = asRecord(redactSecrets(projectResult));
 	const environment = asRecord(redactSecrets(environmentResult));
-	if (!project || !environment) error(404, 'Environment not found');
+	if (
+		!project ||
+		project.uuid !== params.uuid ||
+		!environment ||
+		environment.uuid !== params.environment
+	)
+		error(404, 'Environment not found in this project');
 	const projectName = firstText(project, ['name']) || params.uuid;
 	const environmentName = firstText(environment, ['name']) || params.environment;
 	const projectPath = `/projects/${encodeURIComponent(params.uuid)}`;

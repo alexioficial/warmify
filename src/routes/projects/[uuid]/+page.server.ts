@@ -1,9 +1,9 @@
 import { error } from '@sveltejs/kit';
 
 import { asRecord, firstText, normalizeRecords } from '$lib/resource-presenter';
-import { collectionForPage } from '$lib/server/inventory-cache';
+import { collectionSnapshotForPage } from '$lib/server/inventory-cache';
 import { redactSecrets } from '$lib/server/redact';
-import { createResourceActions } from '$lib/server/resource-detail-page';
+import { createEnvironment } from '$lib/server/project-actions';
 import { getCoolifyClient } from '$lib/server/runtime';
 
 import type { Actions, PageServerLoad } from './$types';
@@ -14,13 +14,13 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 	const [projectResult, environmentResult, resourceResult] = await Promise.all([
 		getCoolifyClient().request('GET', `/projects/${projectUuid}`),
 		getCoolifyClient().request('GET', `/projects/${projectUuid}/environments`),
-		collectionForPage('resources').catch(() => [])
+		collectionSnapshotForPage('resources').catch(() => null)
 	]);
 	const project = asRecord(redactSecrets(projectResult));
 	if (!project) error(404, 'Project not found');
 
 	const counts = new Map<string, number>();
-	for (const resource of normalizeRecords(resourceResult)) {
+	for (const resource of normalizeRecords(resourceResult?.value)) {
 		const environmentId = firstText(resource, ['environment_id']);
 		if (environmentId) counts.set(environmentId, (counts.get(environmentId) ?? 0) + 1);
 	}
@@ -35,10 +35,17 @@ export const load: PageServerLoad = async ({ params, setHeaders }) => {
 		projectUuid: params.uuid,
 		projectName,
 		environments,
+		sync: resourceResult
+			? {
+					updatedAt: resourceResult.updatedAt,
+					fromCache: resourceResult.fromCache,
+					stale: resourceResult.stale
+				}
+			: null,
 		breadcrumbs: [
 			{ label: 'Projects', href: '/projects' },
 			{ label: projectName, href: `/projects/${encodeURIComponent(params.uuid)}` }
 		]
 	};
 };
-export const actions: Actions = createResourceActions('projects');
+export const actions: Actions = { createEnvironment };

@@ -247,6 +247,7 @@ GET /servers/{uuid}/log-drains
 PATCH /servers/{uuid}/log-drains
 GET /servers/{uuid}/proxy
 PATCH /servers/{uuid}/proxy
+PUT /servers/{uuid}/proxy/configuration
 POST /servers/{uuid}/proxy/restart
 GET /servers/{uuid}/sentinel
 PATCH /servers/{uuid}/sentinel

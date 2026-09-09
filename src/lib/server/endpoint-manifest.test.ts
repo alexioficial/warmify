@@ -117,4 +117,28 @@ describe('endpoint manifest', () => {
 			options: { body: { frequency: '0 2 * * *' } }
 		});
 	});
+
+	it('allowlists the dedicated server operation routes', () => {
+		const serverOperations = [
+			'GET:/servers/{uuid}/docker-cleanup',
+			'PATCH:/servers/{uuid}/docker-cleanup',
+			'POST:/servers/{uuid}/docker-cleanup/run',
+			'GET:/servers/{uuid}/docker-cleanup/executions',
+			'GET:/servers/{uuid}/proxy',
+			'PATCH:/servers/{uuid}/proxy',
+			'PUT:/servers/{uuid}/proxy/configuration',
+			'POST:/servers/{uuid}/proxy/restart',
+			'GET:/servers/{uuid}/cloudflare-tunnel',
+			'POST:/servers/{uuid}/cloudflare-tunnel/enable',
+			'POST:/servers/{uuid}/cloudflare-tunnel/disable',
+			'GET:/servers/{uuid}/sentinel',
+			'PATCH:/servers/{uuid}/sentinel',
+			'GET:/servers/{uuid}/log-drains',
+			'PATCH:/servers/{uuid}/log-drains'
+		];
+
+		for (const operation of serverOperations) {
+			expect(getEndpoint(operation).id, operation).toBe(operation);
+		}
+	});
 });

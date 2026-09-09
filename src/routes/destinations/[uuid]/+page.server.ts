@@ -1,7 +1,6 @@
-import { createResourceActions, loadResourceDetail } from '$lib/server/resource-detail-page';
+import { redirect } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
 
-import type { Actions, PageServerLoad } from './$types';
-
-export const load: PageServerLoad = ({ params, setHeaders }) =>
-	loadResourceDetail('destinations', params.uuid, setHeaders);
-export const actions: Actions = createResourceActions('destinations');
+export const load: PageServerLoad = ({ params }) => {
+	redirect(307, `/destinations/${encodeURIComponent(params.uuid)}/general`);
+};

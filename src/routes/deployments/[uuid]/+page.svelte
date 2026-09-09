@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ResourceDetailPage from '$lib/components/ResourceDetailPage.svelte';
+	import DeploymentDetail from '$lib/components/DeploymentDetail.svelte';
 
-	let { data } = $props();
+	let { data, form } = $props();
 </script>
 
-<ResourceDetailPage {data} />
+{#key data}{#key form}<DeploymentDetail {data} {form} />{/key}{/key}

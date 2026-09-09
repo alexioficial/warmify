@@ -27,6 +27,7 @@
 		configurationFields: ReadonlyArray<ConfigurationField>;
 		data: unknown;
 		related: Record<string, unknown>;
+		relatedCapabilities?: Record<string, 'unavailable' | 'error'>;
 		requestError?: string;
 	}
 
@@ -58,6 +59,10 @@
 	let activeSection = $state('overview');
 	const record = $derived(asRecord(data.data));
 	const related = $derived((data.related ?? {}) as Record<string, unknown>);
+	const relatedCapabilities = $derived(data.relatedCapabilities ?? {});
+	const unavailableRelated = $derived(
+		Object.entries(relatedCapabilities).filter(([, status]) => status === 'unavailable')
+	);
 	const summary = $derived(resourceSummary(data.data, data.group));
 	const variableGroups = new Set(['applications', 'services', 'databases', 'servers']);
 	const lifecycleGroups = new Set(['applications', 'services', 'databases']);
@@ -193,6 +198,12 @@
 {#if data.requestError}<p class="error" role="alert">{data.requestError}</p>{/if}
 {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
 {#if form?.message}<p role="status">{form.message}</p>{/if}
+{#if unavailableRelated.length}
+	<p class="muted" role="status">
+		Optional API sections unavailable on this Coolify version:
+		{unavailableRelated.map(([name]) => name.replaceAll('-', ' ')).join(', ')}.
+	</p>
+{/if}
 
 {#if record}
 	<div class:resource-layout={settingsNavGroups.has(data.group)}>
@@ -331,7 +342,10 @@
 							<label>Key <input name="key" required /></label>
 							<label>Value <textarea name="value" required></textarea></label>
 							<div class="inline-list">
-								<label><input type="checkbox" name="is_build_time" /> Build time</label>
+								<label>
+									<input type="hidden" name="is_buildtime" value="false" />
+									<input type="checkbox" name="is_buildtime" value="true" checked /> Build time
+								</label>
 								<label><input type="checkbox" name="is_preview" /> Preview</label>
 								<label><input type="checkbox" name="is_literal" /> Literal</label>
 								<label><input type="checkbox" name="is_multiline" /> Multiline</label>

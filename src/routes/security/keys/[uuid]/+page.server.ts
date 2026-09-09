@@ -1,7 +1,9 @@
-import { createResourceActions, loadResourceDetail } from '$lib/server/resource-detail-page';
+import { loadPrivateKey, privateKeyActions } from '$lib/server/administration-pages';
 
 import type { Actions, PageServerLoad } from './$types';
 
-export const load: PageServerLoad = ({ params, setHeaders }) =>
-	loadResourceDetail('security', params.uuid, setHeaders);
-export const actions: Actions = createResourceActions('security');
+export const load: PageServerLoad = ({ params, setHeaders }) => {
+	setHeaders({ 'cache-control': 'no-store' });
+	return loadPrivateKey(params.uuid);
+};
+export const actions: Actions = privateKeyActions;
