@@ -33,11 +33,16 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=3000
+ENV WARMIFY_DATA_DIR=/data
+
+RUN mkdir -p /data && chown node:node /data
 
 COPY --from=builder /app/build ./build
 COPY --from=builder /app/package.json ./package.json
 COPY --from=production-dependencies /app/package-lock.json ./package-lock.json
 COPY --from=production-dependencies /app/node_modules ./node_modules
+
+USER node
 
 EXPOSE 3000
 
