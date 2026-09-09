@@ -30,13 +30,20 @@
 			{resources.length === 1 ? 'resource' : 'resources'} in {data.projectName}
 		</p>
 	</div>
-	<a
-		class="button primary"
-		href={resolve('/projects/[uuid]/environments/[environment]/new', {
-			uuid: data.projectUuid,
-			environment: data.environmentUuid
-		})}>New resource</a
-	>
+	<div class="actions">
+		<a
+			href={resolve(
+				`/projects/${encodeURIComponent(data.projectUuid)}/environments/${encodeURIComponent(data.environmentUuid)}/settings`
+			)}>Settings</a
+		>
+		<a
+			class="button primary"
+			href={resolve('/projects/[uuid]/environments/[environment]/new', {
+				uuid: data.projectUuid,
+				environment: data.environmentUuid
+			})}>New resource</a
+		>
+	</div>
 </header>
 
 <div class="page-toolbar">
