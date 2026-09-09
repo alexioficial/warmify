@@ -4,8 +4,12 @@
 </script>
 
 <svelte:head><title>Deployments - {data.applicationName} - Warmify</title></svelte:head>
-{#if data.requestError}<p class="error" role="alert">{data.requestError}</p>{/if}
 <section>
 	<h2>Deployments</h2>
-	<DeploymentTable data={data.deployments} />
+	<p class="muted">Active deployments refresh every five seconds while this tab is visible.</p>
+	<DeploymentTable
+		data={data.deployments}
+		pollUrl={`/internal/poll/application-deployments/${encodeURIComponent(data.uuid)}`}
+		initialError={data.requestFailure}
+	/>
 </section>

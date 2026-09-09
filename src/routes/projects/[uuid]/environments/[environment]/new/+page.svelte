@@ -4,6 +4,13 @@
 	let { data } = $props();
 	const applicationTypes = [
 		{
+			id: 'service-template',
+			name: 'Service template',
+			category: 'One-click service',
+			description:
+				'Create a service using a template identifier available on your Coolify instance.'
+		},
+		{
 			id: 'public-repository',
 			name: 'Public Git Repository',
 			category: 'Git source',

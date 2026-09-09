@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { asRecord } from '$lib/resource-presenter';
 
 	interface ConfigurationField {
@@ -72,6 +72,8 @@
 	let booleanDrafts = $state<Record<string, boolean>>(
 		untrack(() => Object.fromEntries(visibleFields.map((field) => [field.name, checked(field)])))
 	);
+	let ready = $state(false);
+	onMount(() => (ready = true));
 </script>
 
 <svelte:head><title>{title} - Warmify</title></svelte:head>
@@ -91,6 +93,7 @@
 						<textarea
 							name={field.name}
 							bind:value={textDrafts[field.name]}
+							disabled={!ready}
 							aria-invalid={fieldErrors[field.name] ? 'true' : undefined}
 							aria-describedby={fieldErrors[field.name] ? `${field.name}-error` : undefined}
 						></textarea>
@@ -101,6 +104,7 @@
 							type="checkbox"
 							value="true"
 							bind:checked={booleanDrafts[field.name]}
+							disabled={!ready}
 							aria-invalid={fieldErrors[field.name] ? 'true' : undefined}
 							aria-describedby={fieldErrors[field.name] ? `${field.name}-error` : undefined}
 						/>
@@ -108,6 +112,7 @@
 						<select
 							name={field.name}
 							bind:value={textDrafts[field.name]}
+							disabled={!ready}
 							aria-invalid={fieldErrors[field.name] ? 'true' : undefined}
 							aria-describedby={fieldErrors[field.name] ? `${field.name}-error` : undefined}
 						>
@@ -120,6 +125,7 @@
 							name={field.name}
 							type={field.type ?? 'text'}
 							bind:value={textDrafts[field.name]}
+							disabled={!ready}
 							min={field.min}
 							max={field.max}
 							autocomplete={field.sensitive ? 'new-password' : undefined}
@@ -134,6 +140,6 @@
 				</label>
 			{/each}
 		</div>
-		<button class="primary" type="submit">Save {title.toLowerCase()}</button>
+		<button class="primary" type="submit" disabled={!ready}>Save {title.toLowerCase()}</button>
 	</form>
 </section>
